@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>AgroCare AI</title>
+
+<link rel="preconnect"
+href="https://fonts.googleapis.com">
+
+<link rel="preconnect"
+href="https://fonts.gstatic.com"
+crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+
+<link rel="stylesheet"
+href="style.css">
+
+</head>
+
+<body class="bg-gray-100">
+
+<!-- =======================================================
+HEADER
+======================================================= -->
+
+<link rel="stylesheet" href="style.css">
+
+<header class="bg-green-700 text-white shadow">
+
+<div class="max-w-7xl mx-auto flex justify-between items-center p-5">
+
+<div class="flex items-center gap-3">
+
+<i class="fa-solid fa-leaf text-3xl"></i>
+
+<div>
+
+<h1 class="text-3xl font-bold">
+
+AgroCare AI
+
+</h1>
+
+<p class="text-green-100">
+
+Hệ thống nhận diện bệnh cây trồng bằng AI
+
+</p>
+
+</div>
+
+</div>
+
+<div class="flex gap-3">
+
+<button
+
+id="themeButton"
+
+class="bg-white text-green-700 px-4 py-2 rounded-xl"
+
+>
+
+<i class="fa-solid fa-moon"></i>
+
+</button>
+
+</div>
+
+</div>
+
+</header>
+
+<!-- =======================================================
+MAIN
+======================================================= -->
+
+<main class="max-w-7xl mx-auto p-8">
+
+<!-- =======================================================
+GIỚI THIỆU
+======================================================= -->
+
+<section
+id="home"
+class="bg-white rounded-3xl shadow p-8">
+
+<h2
+class="text-4xl font-bold text-green-700">
+
+Chào mừng đến với AgroCare AI 🌿
+
+</h2>
+
+<p
+class="mt-5 text-gray-600 leading-8">
+
+Tải ảnh cây trồng lên để AI phân tích bệnh,
+đánh giá mức độ nguy hiểm
+và đưa ra hướng xử lý phù hợp.
+
+</p>
+
+</section>
+<!-- =======================================================
+DASHBOARD
+======================================================= -->
+
+<section
+class="grid md:grid-cols-4 gap-6 mt-8">
+
+<div
+class="bg-white rounded-3xl shadow p-6 text-center">
+
+<i class="fa-solid fa-seedling text-4xl text-green-600"></i>
+
+<h3
+class="mt-4 text-gray-500">
+
+Tổng lượt nhận diện
+
+</h3>
+
+<p
+id="totalDetect"
+class="text-4xl font-bold mt-2 text-green-700">
+
+0
+
+</p>
+
+</div>
+
+<div
+class="bg-white rounded-3xl shadow p-6 text-center">
+
+<i class="fa-solid fa-calendar-day text-4xl text-blue-600"></i>
+
+<h3
+class="mt-4 text-gray-500">
+
+Hôm nay
+
+</h3>
+
+<p
+id="todayDetect"
+class="text-4xl font-bold mt-2 text-blue-700">
+
+0
+
+</p>
+
+</div>
+
+<div
+class="bg-white rounded-3xl shadow p-6 text-center">
+
+<i class="fa-solid fa-circle-check text-4xl text-emerald-600"></i>
+
+<h3
+class="mt-4 text-gray-500">
+
+Bệnh nhẹ
+
+</h3>
+
+<p
+id="lightCount"
+class="text-4xl font-bold mt-2 text-emerald-700">
+
+0
+
+</p>
+
+</div>
+
+<div
+class="bg-white rounded-3xl shadow p-6 text-center">
+
+<i class="fa-solid fa-triangle-exclamation text-4xl text-red-600"></i>
+
+<h3
+class="mt-4 text-gray-500">
+
+Bệnh nặng
+
+</h3>
+
+<p
+id="heavyCount"
+class="text-4xl font-bold mt-2 text-red-700">
+
+0
+
+</p>
+
+</div>
+
+</section>
+
+<!-- =======================================================
+UPLOAD ẢNH
+======================================================= -->
+
+<section
+id="detect"
+class="bg-white rounded-3xl shadow p-8 mt-8">
+
+<h2
+class="text-3xl font-bold mb-6">
+
+Nhận diện bệnh cây
+
+</h2>
+
+<div
+
+id="dropArea"
+
+class="border-4 border-dashed border-green-400 rounded-3xl p-10 text-center cursor-pointer transition">
+
+<i
+class="fa-solid fa-cloud-arrow-up text-6xl text-green-600"></i>
+
+<h3
+class="text-2xl font-bold mt-6">
+
+Kéo và thả ảnh vào đây
+
+</h3>
+
+<p
+class="text-gray-500 mt-2">
+
+hoặc
+
+</p>
+
+<label
+for="imageInput"
+class="inline-block mt-6 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl cursor-pointer">
+
+<i class="fa-solid fa-image"></i>
+
+Chọn ảnh
+
+</label>
+
+<input
+
+type="file"
+
+id="imageInput"
+
+accept="image/*"
+
+hidden>
+
+</div>
+
+<img
+
+id="previewImage"
+
+class="hidden mt-8 rounded-3xl shadow w-full">
+
+<div
+class="flex flex-wrap gap-4 mt-8">
+
+<button
+
+id="detectButton"
+
+class="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl">
+
+<i class="fa-solid fa-magnifying-glass"></i>
+
+Nhận diện bằng AI
+
+</button>
+
+<button
+
+id="clearResult"
+
+class="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl">
+
+<i class="fa-solid fa-trash"></i>
+
+Xóa
+
+</button>
+
+<button
+
+id="copyResult"
+
+class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl">
+
+<i class="fa-solid fa-copy"></i>
+
+Sao chép kết quả
+
+</button>
+
+<button
+
+id="refreshHistory"
+
+class="bg-yellow-500 hover:bg-yellow-600 text-white px-8 py-4 rounded-xl">
+
+<i class="fa-solid fa-rotate"></i>
+
+Làm mới
+
+</button>
+
+</div>
+
+</section>
+<!-- =======================================================
+KẾT QUẢ PHÂN TÍCH AI
+======================================================= -->
+
+<section
+
+id="resultBox"
+
+class="hidden bg-white rounded-3xl shadow p-8 mt-8">
+
+<h2
+
+class="text-3xl font-bold mb-8">
+
+<i class="fa-solid fa-brain text-green-600"></i>
+
+Kết quả phân tích AI
+
+</h2>
+
+<img
+
+id="resultImage"
+
+class="w-full rounded-3xl shadow mb-8">
+
+<div
+
+class="grid md:grid-cols-2 gap-6">
+
+<div class="bg-green-50 rounded-2xl p-5">
+
+<h3 class="font-bold text-lg">
+
+🌿 Tên bệnh
+
+</h3>
+
+<p
+
+id="disease"
+
+class="mt-3 text-lg">
+
+-
+
+</p>
+
+</div>
+
+<div class="bg-blue-50 rounded-2xl p-5">
+
+<h3 class="font-bold text-lg">
+
+🎯 Độ chính xác
+
+</h3>
+
+<p
+
+id="confidence"
+
+class="mt-3 text-lg">
+
+-
+
+</p>
+
+</div>
+
+<div class="bg-yellow-50 rounded-2xl p-5">
+
+<h3 class="font-bold text-lg">
+
+⚠️ Mức độ nguy hiểm
+
+</h3>
+
+<p
+
+id="level"
+
+class="mt-3 text-lg">
+
+-
+
+</p>
+
+</div>
+
+<div class="bg-red-50 rounded-2xl p-5">
+
+<h3 class="font-bold text-lg">
+
+🦠 Nguyên nhân
+
+</h3>
+
+<p
+
+id="cause"
+
+class="mt-3 leading-7">
+
+-
+
+</p>
+
+</div>
+
+</div>
+
+<div
+
+class="grid md:grid-cols-2 gap-6 mt-6">
+
+<div class="bg-emerald-50 rounded-2xl p-6">
+
+<h3 class="font-bold text-lg">
+
+✅ Hướng xử lý
+
+</h3>
+
+<p
+
+id="solution"
+
+class="mt-4 leading-8">
+
+-
+
+</p>
+
+</div>
+
+<div class="bg-indigo-50 rounded-2xl p-6">
+
+<h3 class="font-bold text-lg">
+
+💊 Thuốc đề xuất
+
+</h3>
+
+<p
+
+id="medicine"
+
+class="mt-4 leading-8">
+
+-
+
+</p>
+
+</div>
+
+</div>
+
+<div
+
+class="bg-lime-50 rounded-2xl p-6 mt-6">
+
+<h3
+
+class="font-bold text-lg">
+
+🛡️ Cách phòng tránh
+
+</h3>
+
+<p
+
+id="prevent"
+
+class="mt-4 leading-8">
+
+-
+
+</p>
+
+</div>
+
+</section>
+
+<!-- =======================================================
+LỊCH SỬ NHẬN DIỆN
+======================================================= -->
+
+<section
+id="history"
+class="bg-white rounded-3xl shadow p-8 mt-8">
+
+<div
+
+class="flex flex-col md:flex-row justify-between gap-4 mb-6">
+
+<h2
+
+class="text-3xl font-bold">
+
+Lịch sử nhận diện
+
+</h2>
+
+<div
+
+class="flex gap-3">
+
+<input
+
+id="searchHistory"
+
+type="text"
+
+placeholder="Tìm kiếm..."
+
+class="border rounded-xl px-4 py-3 w-64">
+
+<button
+
+id="exportHistory"
+
+class="bg-blue-600 text-white px-5 rounded-xl">
+
+Xuất JSON
+
+</button>
+
+<button
+    id="exportExcel"
+    class="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl">
+
+    <i class="fa-solid fa-file-excel"></i>
+
+    Xuất Excel
+
+</button>
+
+<button
+
+id="clearHistory"
+
+class="bg-red-600 text-white px-5 rounded-xl">
+
+Xóa
+
+</button>
+
+</div>
+
+</div>
+
+<div
+
+id="historyList">
+
+<div
+
+class="text-center text-gray-400 py-10">
+
+Chưa có dữ liệu.
+
+</div>
+
+</div>
+
+</section>
+<!-- =======================================================
+ĐÁNH GIÁ NGƯỜI DÙNG
+======================================================= -->
+
+<section
+id="reviews"
+class="bg-white rounded-3xl shadow p-8 mt-8">
+
+<div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+
+<h2 class="text-3xl font-bold">
+
+Đánh giá từ người dùng
+
+</h2>
+
+<div class="text-yellow-500 text-xl">
+
+★★★★★
+
+<span
+
+id="averageRating"
+
+class="text-black ml-2">
+
+0.0 (0 đánh giá)
+
+</span>
+
+</div>
+
+</div>
+
+<div class="flex flex-col md:flex-row gap-4 mb-8">
+
+<input
+
+id="searchReview"
+
+type="text"
+
+placeholder="Tìm đánh giá..."
+
+class="border rounded-xl px-4 py-3 flex-1">
+
+<select
+
+id="filterStar"
+
+class="border rounded-xl px-4 py-3 w-56">
+
+<option value="0">
+
+Tất cả
+
+</option>
+
+<option value="5">
+
+★★★★★
+
+</option>
+
+<option value="4">
+
+★★★★☆
+
+</option>
+
+<option value="3">
+
+★★★☆☆
+
+</option>
+
+<option value="2">
+
+★★☆☆☆
+
+</option>
+
+<option value="1">
+
+★☆☆☆☆
+
+</option>
+
+</select>
+
+</div>
+
+<div
+
+id="reviewList">
+
+<div class="text-center py-10 text-gray-400">
+
+Chưa có đánh giá.
+
+</div>
+
+</div>
+
+<div
+
+id="reviewPagination"
+
+class="flex justify-center mt-8 gap-2">
+
+</div>
+
+<hr class="my-10">
+
+<h3 class="text-2xl font-bold mb-6">
+
+Gửi đánh giá
+
+</h3>
+
+<input
+
+id="reviewName"
+
+class="w-full border rounded-xl p-4 mb-4"
+
+placeholder="Tên của bạn">
+
+<select
+
+id="reviewStar"
+
+class="w-full border rounded-xl p-4 mb-4">
+
+<option value="5">
+
+★★★★★ Rất tốt
+
+</option>
+
+<option value="4">
+
+★★★★☆ Tốt
+
+</option>
+
+<option value="3">
+
+★★★☆☆ Bình thường
+
+</option>
+
+<option value="2">
+
+★★☆☆☆ Chưa tốt
+
+</option>
+
+<option value="1">
+
+★☆☆☆☆ Kém
+
+</option>
+
+</select>
+
+<textarea
+
+id="reviewContent"
+
+rows="5"
+
+class="w-full border rounded-xl p-4 mb-5"
+
+placeholder="Nhập đánh giá của bạn...">
+
+</textarea>
+
+<button
+
+id="sendReview"
+
+class="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl">
+
+<i class="fa-solid fa-paper-plane"></i>
+
+Gửi đánh giá
+
+</button>
+
+</section>
+
+<!-- =======================================================
+FOOTER
+======================================================= -->
+
+<footer class="mt-12 bg-green-700 text-white rounded-3xl p-8">
+
+<div class="grid md:grid-cols-3 gap-8">
+
+<div>
+
+<h2 class="text-2xl font-bold">
+
+🌿 AgroCare AI
+
+</h2>
+
+<p class="mt-4 leading-7">
+
+Ứng dụng sử dụng AI để nhận diện bệnh cây trồng,
+hỗ trợ người nông dân phát hiện sớm bệnh,
+đưa ra hướng xử lý nhanh chóng và hiệu quả.
+
+</p>
+
+</div>
+
+<div>
+
+<h3 class="text-xl font-bold">
+
+Liên kết
+
+</h3>
+
+<ul class="mt-4 space-y-3">
+
+<li>
+
+<a href="#home">
+
+Trang chủ
+
+</a>
+
+</li>
+
+<li>
+
+<a href="#detect">
+
+Nhận diện
+
+</a>
+
+</li>
+
+<li>
+
+<a href="#history">
+
+Lịch sử
+
+</a>
+
+</li>
+
+<li>
+
+<a href="#reviews">
+
+Đánh giá
+
+</a>
+
+</li>
+
+</ul>
+
+</div>
+
+<div>
+
+<h3 class="text-xl font-bold">
+
+Liên hệ
+
+</h3>
+
+<p class="mt-4">
+
+<i class="fa-solid fa-envelope"></i>
+
+anh.mac0106@gmail.com
+
+</p>
+
+<p class="mt-3">
+
+<i class="fa-solid fa-phone"></i>
+
+0941 954 161
+
+</p>
+
+<p class="mt-3">
+
+<i class="fa-solid fa-location-dot"></i>
+
+Việt Nam
+
+</p>
+
+</div>
+
+</div>
+
+<p class="text-center mt-10 border-t border-green-500 pt-6">
+
+© 2026 AgroCare AI. All rights reserved.
+
+</p>
+
+</footer>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+
+</html>
