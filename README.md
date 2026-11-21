@@ -2,7 +2,7 @@
 
 Ứng dụng web tiếng Việt phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử riêng theo tài khoản và xuất Excel có ảnh. Phiên bản này được chuẩn bị cho **Vercel + Supabase**: Express chạy API, Supabase cung cấp đăng nhập Google, Postgres và kho ảnh riêng tư.
 
-Website: https://agro-care-ai-drab.vercel.app. Cấu hình Google OAuth và kiểm tra đăng nhập thực tế theo [hướng dẫn triển khai](docs/DEPLOYMENT.md) trước khi mở sử dụng rộng rãi.
+Website: https://agro-care-ai-drab.vercel.app. Google OAuth đã cấu hình và kiểm tra đăng nhập trên production. Phạm vi kiểm tra và hướng dẫn vận hành nằm trong [hướng dẫn triển khai](docs/DEPLOYMENT.md).
 
 ## Chức năng
 

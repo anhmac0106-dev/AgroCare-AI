@@ -2,7 +2,7 @@
 
 Phương án thử nghiệm: Vercel Hobby chạy Express và giao diện; Supabase Free chạy Auth, Postgres và Storage riêng tư. Không lưu database hoặc ảnh lâu dài trên filesystem của Vercel.
 
-Tài liệu này là hướng dẫn triển khai, không phải xác nhận dịch vụ đã được tạo hay website đã public. Cần kiểm tra bằng project Supabase và deployment Vercel thật trước khi mở cho người dùng.
+Website production: https://agro-care-ai-drab.vercel.app. Supabase đã chạy migration, Google OAuth đã liên kết và chuyển sang Production; xem phạm vi kiểm tra cuối tài liệu.
 
 ## 1. Điều kiện của gói miễn phí
 
@@ -117,6 +117,11 @@ Harness dùng 20 kết nối `psql` đồng thời, yêu cầu đúng 10 lượt
 - Theo dõi Storage, database, egress và ngân sách DeepSeek. Khi vượt gói miễn phí, giới hạn tính năng hoặc nâng cấp theo quyết định của chủ dự án.
 - Có kế hoạch backup/export database và object storage riêng. Gói miễn phí không được xem là cam kết uptime hay chiến lược backup đầy đủ.
 
-## Trạng thái xác minh
+## Trạng thái xác minh ngày 21/11/2026
 
-SQL migration và test harness đi kèm cần được chạy trên Supabase/Postgres thật. Nếu môi trường phát triển chưa có `psql`, Docker hoặc credentials cloud, chỉ có thể kiểm tra mã nguồn và test ứng dụng; chưa được coi là deployment đã sẵn sàng phục vụ công khai.
+- Vercel Hobby đã triển khai website, API và Supabase SDK. API riêng trả 401 khi không có phiên; `/api/config` chỉ trả URL và khóa công khai.
+- Supabase Free: migration đã chạy; kiểm tra SQL thực tế đạt cho RLS, quyền bảng/RPC, bucket private, 10 lượt thành công, lượt thứ 11 bị từ chối và cửa sổ hết hạn sau 8 giờ. Dữ liệu test SQL được rollback.
+- Google OAuth thuộc project `hybrid-flame-515415-n3` (AgroCare AI), quản lý qua tài khoản Google Cloud được chủ dự án chỉ định. Audience External, trạng thái In production; callback đúng Supabase. Chỉ dùng email/profile.
+- Hai tài khoản Google đăng nhập thực tế thành công. Đã kiểm tra khôi phục phiên sau reload, tải quota 10/10, lịch sử/đánh giá và đăng xuất. Email provider tắt; không cần SMTP cho đăng nhập Google.
+- Bộ test ứng dụng hiện có 17 test đạt (quyền sở hữu, giới hạn đầu vào, quota mock, Google login, XSS rendering, xuất Excel nhúng ảnh).
+- Chưa xác minh lại nhận diện DeepSeek và xuất Excel bằng ảnh thật trên cloud, chưa chạy harness 20 kết nối Postgres đồng thời. Không coi những mục này đã đạt chỉ từ test mock.
