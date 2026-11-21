@@ -9,11 +9,11 @@ export async function detectPlantDisease(imagePath) {
     const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
     if (!apiKey) throw new Error("Chưa cấu hình DEEPSEEK_API_KEY trong .env");
 
-    const mimeType = mime.lookup(imagePath);
+    const mimeType = Buffer.isBuffer(imagePath) ? "image/jpeg" : mime.lookup(imagePath);
     if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mimeType)) {
         throw new Error("DeepSeek chỉ hỗ trợ ảnh JPEG, PNG, GIF và WebP");
     }
-    const image = await fs.readFile(imagePath);
+    const image = Buffer.isBuffer(imagePath) ? imagePath : await fs.readFile(imagePath);
     const response = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
         headers: {

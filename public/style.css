@@ -920,3 +920,32 @@ html{
 scroll-padding-top:80px;
 
 }
+/* Account controls and private data states */
+[hidden] { display: none !important; }
+.auth-card { margin-bottom:24px; padding:24px; border:1px solid #e9ecef; border-radius:8px; background:#fff; color:#343a40; }
+.auth-card h2 { font-size:22px; font-weight:600; margin-bottom:12px; }
+.auth-card p { margin:12px 0; }
+.auth-form { display:grid; gap:8px; max-width:520px; }
+.auth-form label { font-size:14px; font-weight:500; }
+.auth-form input { min-height:38px; padding:8px 12px; border:1px solid #dee2e6; border-radius:6px; width:100%; }
+.auth-form input:focus { border-color:#7a4e1d; box-shadow:inset 0 0 0 .5px #7a4e1d; }
+.auth-actions { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+.auth-card button, .auth-secondary { min-height:38px; padding:8px 16px; background:#fff; color:#6e5840; border:1px solid #ddd8d1; border-radius:6px; font-size:14px; }
+.auth-card button:hover, .auth-secondary:hover { background:#f8f9fa; box-shadow:none; transform:none; }
+.auth-card button:focus-visible, .auth-secondary:focus-visible { outline:2px solid #7a4e1d; outline-offset:3px; }
+.auth-help { color:#626b73; font-size:14px; }
+.quota-status { font-variant-numeric:tabular-nums; font-weight:600; }
+#appMessage { padding:12px; border-left:3px solid #486052; background:#f5f8f6; }
+#appMessage:empty { display:none; }
+#appMessage.is-error { border-color:#a64a4a; color:#a64a4a; background:#fcf6f6; }
+#adminControls { display:flex; align-items:center; gap:8px; margin:16px 0; }
+#adminControls input { width:18px; height:18px; }
+button:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
+.history-card { padding:20px; margin-bottom:16px; border:1px solid #e9ecef; border-radius:8px; overflow-wrap:anywhere; }
+.history-card h3 { font-weight:600; }
+.history-card p { margin:8px 0; white-space:pre-wrap; }
+.history-card img { max-width:100%; max-height:280px; object-fit:contain; margin-top:12px; }
+.reviewCard p { white-space:pre-wrap; overflow-wrap:anywhere; }
+body.dark .auth-card { background:#1f2937; color:#fff; }
+body.dark .auth-help { color:#d1d5db; }
+@media(max-width:768px) { .auth-card { padding:16px; } .auth-actions { flex-direction:column; } }

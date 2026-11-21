@@ -1,1714 +1,289 @@
-/* ============================================================
-# CẤU HÌNH
-============================================================ */
-
-const API_URL = "http://localhost:3000";
-
-/* ============================================================
-# GỬI REQUEST
-============================================================ */
-
-async function api(url, options = {}) {
-
-    const response = await fetch(API_URL + url, {
-
-        headers: {
-
-            "Content-Type": "application/json"
-
-        },
-
-        ...options
-
-    });
-
-    return await response.json();
-
-}
-
-/* ============================================================
-# THÔNG BÁO
-============================================================ */
-
-function showToast(message, type = "success") {
-
-    Swal.fire({
-
-        toast: true,
-
-        position: "top-end",
-
-        icon: type,
-
-        title: message,
-
-        timer: 2000,
-
-        showConfirmButton: false
-
-    });
-
-}
-/* ============================================================
-# CHỌN ẢNH
-============================================================ */
-
-const imageInput = document.getElementById("imageInput");
-
-const previewImage = document.getElementById("previewImage");
-
-if(imageInput){
-
-    imageInput.onchange = function(){
-
-        const file = this.files[0];
-
-        if(!file) return;
-
-        previewImage.src = URL.createObjectURL(file);
-
-        previewImage.classList.remove("hidden");
-
+/* Authenticated UI. User and AI content is always rendered as text. */
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const PAGE_SIZE = 100;
+  const JSON_EXPORT_LIMIT = 10000;
+  const state = { client: null, session: null, user: null, quota: null, history: [], reviews: [], scope: '', epoch: 0, controller: new AbortController(), urls: new Set(), busy: false, authBusy: false, recovery: false, previewUrl: null, moreHistory: false, moreReviews: false };
+  const text = (id, value) => { if ($(id)) $(id).textContent = value ?? ''; };
+  const message = (value, error = false) => { text('appMessage', value); $('appMessage').classList.toggle('is-error', error); };
+  const node = (tag, value, className) => { const el = document.createElement(tag); el.textContent = value ?? ''; if (className) el.className = className; return el; };
+  const dateText = value => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('vi-VN'); };
+  const scoped = url => state.scope ? `${url}?scope=all` : url;
+  const own = item => item.user_id === state.user?.id;
+  function active(epoch) { if (epoch !== state.epoch) throw new DOMException('Session changed', 'AbortError'); }
+  function releaseImages() { state.urls.forEach(url => URL.revokeObjectURL(url)); state.urls.clear(); }
+  function clearPrivate() {
+    state.controller.abort(); state.controller = new AbortController(); state.epoch++;
+    releaseImages(); state.history = []; state.reviews = []; state.user = null; state.quota = null; state.scope = ''; state.busy = false; state.recovery = false;
+    $('adminScope').checked = false; $('adminControls').hidden = true;
+    $('historyList').replaceChildren(node('p', 'Đăng nhập để xem lịch sử của bạn.'));
+    $('reviewList').replaceChildren(node('p', 'Đăng nhập để xem đánh giá của bạn.'));
+    $('reviewPagination').replaceChildren();
+    $('resultBox').classList.add('hidden'); $('resultImage').removeAttribute('src');
+    for (const field of ['disease','confidence','level','cause','solution','medicine','prevent']) text(field, '');
+    for (const field of ['totalDetect','todayDetect','lightCount','heavyCount']) text(field, '0');
+    text('averageRating', '0.0 (0 đánh giá)'); text('accountEmail', ''); text('quotaStatus', 'Đăng nhập để sử dụng nhận diện.');
+    $('reviewName').value = ''; $('reviewContent').value = ''; clearPreview();
+    updateControls();
+  }
+  function updateControls() {
+    const loggedIn = Boolean(state.session && state.user);
+    $('signedInPanel').hidden = !loggedIn;
+    $('authForm').hidden = loggedIn && !state.recovery;
+    $('detectButton').disabled = !loggedIn || state.busy || !(state.quota?.remaining > 0);
+    for (const id of ['exportExcel','exportHistory','refreshHistory','sendReview']) $(id).disabled = !loggedIn || state.busy;
+    $('clearHistory').disabled = !loggedIn || state.busy || Boolean(state.scope);
+    $('adminScope').disabled = state.busy;
+    for (const id of ['signIn','signUp','resetPassword','updatePassword']) $(id).disabled = state.authBusy;
+    $('signOut').disabled = state.authBusy;
+    $('updatePassword').hidden = !state.recovery;
+    $('signIn').hidden = state.recovery; $('signUp').hidden = state.recovery; $('resetPassword').hidden = state.recovery;
+  }
+  async function api(url, options = {}, epoch = state.epoch) {
+    active(epoch);
+    if (!state.session) throw new Error('Vui lòng đăng nhập.');
+    const headers = { ...options.headers, Authorization: `Bearer ${state.session.access_token}` };
+    if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+    const response = await fetch(url, { ...options, headers, signal: state.controller.signal, cache: 'no-store' });
+    active(epoch);
+    if (response.status === 401) {
+      state.session = null; clearPrivate();
+      void state.client?.auth.signOut({ scope: 'local' });
+      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }
-
-}
-/* ============================================================
-# NHẬN DIỆN
-============================================================ */
-
-const detectButton = document.getElementById("detectButton");
-
-if(detectButton){
-
-detectButton.onclick = async ()=>{
-
-const file=imageInput.files[0];
-
-if(!file){
-
-showToast(
-
-"Bạn chưa chọn ảnh",
-
-"warning"
-
-);
-
-return;
-
-}
-
-const form=new FormData();
-
-form.append(
-
-"image",
-
-file
-
-);
-
-showLoading();
-
-const response=await fetch(
-
-API_URL+"/api/detect",
-
-{
-
-method:"POST",
-
-body:form
-
-}
-
-);
-
-const result=await response.json();
-
-hideLoading();
-
-if(!result.success){
-
-showToast(
-
-"Lỗi nhận diện",
-
-"error"
-
-);
-
-return;
-
-}
-
-displayResult(result);
-
-};
-
-}
-/* ============================================================
-# HIỂN THỊ KẾT QUẢ
-============================================================ */
-
-function displayResult(data){
-
-const box=document.getElementById(
-
-"resultBox"
-
-);
-
-box.classList.remove(
-
-"hidden"
-
-);
-
-document.getElementById(
-
-"disease"
-
-).innerText=data.result;
-
-}
-/* ============================================================
-# LOADING
-============================================================ */
-
-function showLoading(){
-
-Swal.fire({
-
-title:"Đang phân tích...",
-
-text:"AI đang nhận diện bệnh cây",
-
-allowOutsideClick:false,
-
-didOpen(){
-
-Swal.showLoading();
-
-}
-
-});
-
-}
-
-function hideLoading(){
-
-Swal.close();
-
-}
-/* ============================================================
-# TẢI DANH SÁCH ĐÁNH GIÁ TỪ SERVER
-============================================================ */
-
-async function loadReviews(){
-
-    try{
-
-        const response = await api("/api/reviews");
-
-        if(!response.success){
-
-            showToast(
-
-                "Không tải được đánh giá",
-
-                "error"
-
-            );
-
-            return;
-
-        }
-
-        reviews = response.data;
-
-        renderReviews();
-
+    if (!response.ok) {
+      let error; try { error = await response.json(); } catch { /* non-JSON gateway error */ }
+      active(epoch);
+      throw new Error(error?.error || error?.message || `Yêu cầu thất bại (HTTP ${response.status}).`);
     }
-
-    catch(error){
-
-        console.log(error);
-
-    }
-
-}
-
-/* ============================================================
-# GỬI ĐÁNH GIÁ LÊN SERVER
-============================================================ */
-
-if(sendReview){
-
-sendReview.onclick = async ()=>{
-
-const name = reviewName.value.trim();
-
-const star = Number(reviewStar.value);
-
-const content = reviewContent.value.trim();
-
-if(name===""){
-
-showToast(
-
-"Vui lòng nhập tên",
-
-"warning"
-
-);
-
-return;
-
-}
-
-if(content===""){
-
-showToast(
-
-"Vui lòng nhập đánh giá",
-
-"warning"
-
-);
-
-return;
-
-}
-
-const result = await api(
-
-"/api/reviews",
-
-{
-
-method:"POST",
-
-body:JSON.stringify({
-
-name,
-
-star,
-
-content
-
-})
-
-}
-
-);
-
-if(!result.success){
-
-showToast(
-
-"Gửi thất bại",
-
-"error"
-
-);
-
-return;
-
-}
-
-reviewName.value="";
-
-reviewContent.value="";
-
-reviewStar.value="5";
-
-showToast(
-
-"Cảm ơn bạn đã đánh giá ❤️"
-
-);
-
-await loadReviews();
-
-};
-
-}
-/* ============================================================
-# HIỂN THỊ REVIEW
-============================================================ */
-
-function renderReviews(){
-
-if(!reviewList) return;
-
-reviewList.innerHTML="";
-
-if(reviews.length===0){
-
-reviewList.innerHTML=`
-
-<div class="emptyState">
-
-<i class="fa-solid fa-comments"></i>
-
-<h3>
-
-Chưa có đánh giá
-
-</h3>
-
-<p>
-
-Hãy là người đầu tiên đánh giá AgroCare AI.
-
-</p>
-
-</div>
-
-`;
-
-averageRating.innerHTML="0.0 (0 đánh giá)";
-
-return;
-
-}
-
-let total=0;
-
-reviews.forEach(review=>{
-
-total+=review.star;
-
-reviewList.innerHTML+=`
-
-<div class="border rounded-xl p-5 mb-4 shadow">
-
-<div class="flex justify-between">
-
-<div>
-
-<h3 class="font-bold">
-
-${review.name}
-
-</h3>
-
-<small class="text-gray-500">
-
-${review.created_at??""}
-
-</small>
-
-</div>
-
-<div class="text-yellow-500">
-
-${"★".repeat(review.star)}
-
-</div>
-
-</div>
-
-<p class="mt-3">
-
-${review.content}
-
-</p>
-
-</div>
-
-`;
-
-});
-
-const avg=(total/reviews.length).toFixed(1);
-
-averageRating.innerHTML=`
-
-${avg}
-
-(${reviews.length} đánh giá)
-
-`;
-
-}
-/* ============================================================
-# KHỞI TẠO
-============================================================ */
-
-window.addEventListener(
-
-"DOMContentLoaded",
-
-async ()=>{
-
-await loadReviews();
-
-}
-
-);
-/* ============================================================
-# LƯU LỊCH SỬ NHẬN DIỆN
-============================================================ */
-
-async function saveHistory(result){
-
-    try{
-
-        const data = parseAIResult(result.result);
-
-        await api(
-
-            "/api/history",
-
-            {
-
-                method:"POST",
-
-                body:JSON.stringify({
-
-                    image:result.image,
-
-                    disease:data.disease,
-
-                    solution:data.solution,
-
-                    level:data.level
-
-                })
-
-            }
-
-        );
-
-    }
-
-    catch(error){
-
-        console.log(error);
-
-    }
-
-}
-
-/* ============================================================
-# TẢI LỊCH SỬ
-============================================================ */
-
-async function loadHistory(){
-
-    try{
-
-        const response=await api("/api/history");
-
-        if(!response.success) return;
-
-        renderHistory(
-
-            response.data
-
-        );
-
-    }
-
-    catch(error){
-
-        console.log(error);
-
-    }
-
-}
-
-/* ============================================================
-# HIỂN THỊ LỊCH SỬ
-============================================================ */
-
-function renderHistory(data){
-
-const history=document.getElementById(
-
-"historyList"
-
-);
-
-if(!history) return;
-
-history.innerHTML="";
-
-if(data.length===0){
-
-history.innerHTML=`
-
-<div class="text-center text-gray-500 py-10">
-
-Chưa có lịch sử nhận diện
-
-</div>
-
-`;
-
-return;
-
-}
-
-data.forEach(item=>{
-
-history.innerHTML+=`
-
-<div class="bg-white rounded-xl shadow p-5 mb-4">
-
-<div class="flex justify-between">
-
-<div>
-
-<h3 class="font-bold text-lg">
-
-${item.disease}
-
-</h3>
-
-<p class="text-gray-500">
-
-${item.level}
-
-</p>
-
-</div>
-
-<div>
-
-<small>
-
-${item.created_at}
-
-</small>
-
-</div>
-
-</div>
-
-<p class="mt-3">
-
-${item.solution}
-
-</p>
-
-</div>
-
-`;
-
-});
-
-}
-
-/* ============================================================
-# SAU KHI AI PHÂN TÍCH XONG
-============================================================ */
-
-async function afterDetect(result){
-
-displayResult(result);
-
-await saveHistory(result);
-
-await loadHistory();
-
-}
-
-/* ============================================================
-# CẬP NHẬT detectButton
-============================================================ */
-
-if(detectButton){
-
-detectButton.onclick=async()=>{
-
-const file=imageInput.files[0];
-
-if(!file){
-
-showToast(
-
-"Bạn chưa chọn ảnh",
-
-"warning"
-
-);
-
-return;
-
-}
-
-const form=new FormData();
-
-form.append(
-
-"image",
-
-file
-
-);
-
-showLoading();
-
-const response=await fetch(
-
-API_URL+"/api/detect",
-
-{
-
-method:"POST",
-
-body:form
-
-}
-
-);
-
-const result=await response.json();
-
-hideLoading();
-
-if(!result.success){
-
-showToast(
-
-"Lỗi AI",
-
-"error"
-
-);
-
-return;
-
-}
-
-await afterDetect(result);
-
-};
-
-}
-
-/* ============================================================
-# TÌM KIẾM LỊCH SỬ
-============================================================ */
-
-const searchHistory=document.getElementById(
-
-"searchHistory"
-
-);
-
-if(searchHistory){
-
-searchHistory.oninput=()=>{
-
-const keyword=searchHistory.value.toLowerCase();
-
-const cards=document.querySelectorAll(
-
-"#historyList > div"
-
-);
-
-cards.forEach(card=>{
-
-if(
-
-card.innerText.toLowerCase().includes(keyword)
-
-){
-
-card.style.display="block";
-
-}else{
-
-card.style.display="none";
-
-}
-
-});
-
-};
-
-}
-
-/* ============================================================
-# THỐNG KÊ
-============================================================ */
-
-async function updateStatistics(){
-
-try{
-
-const response=await api(
-
-"/api/history"
-
-);
-
-if(!response.success) return;
-
-const history=response.data;
-
-document.getElementById(
-
-"totalDetect"
-
-).innerText=history.length;
-
-const today=new Date().toLocaleDateString();
-
-let todayCount=0;
-
-history.forEach(item=>{
-
-if(
-
-item.created_at.includes(today)
-
-){
-
-todayCount++;
-
-}
-
-});
-
-document.getElementById(
-
-"todayDetect"
-
-).innerText=todayCount;
-
-}
-
-catch(error){
-
-console.log(error);
-
-}
-
-}
-
-/* ============================================================
-# KHỞI TẠO
-============================================================ */
-
-window.addEventListener(
-
-"DOMContentLoaded",
-
-async()=>{
-
-await loadReviews();
-
-await loadHistory();
-
-await updateStatistics();
-
-}
-);
-/* ============================================================
-# PARSE KẾT QUẢ AI
-============================================================ */
-
-function parseAIResult(text){
-
-    try{
-
-        const clean = text
-            .replace(/```json/g,"")
-            .replace(/```/g,"")
-            .trim();
-
-        return JSON.parse(clean);
-
-    }
-
-    catch(error){
-
-        return{
-
-            disease:"Không xác định",
-
-            confidence:"--",
-
-            level:"--",
-
-            cause:text,
-
-            solution:"Không có",
-
-            medicine:"Không có",
-
-            prevent:"Không có"
-
-        };
-
-    }
-
-}
-
-/* ============================================================
-# HIỂN THỊ KẾT QUẢ AI
-============================================================ */
-
-function displayResult(response){
-
-    const data = parseAIResult(response.result);
-
-    const resultBox = document.getElementById("resultBox");
-
-    resultBox.classList.remove("hidden");
-
-    document.getElementById("disease").innerText=data.disease;
-
-    document.getElementById("confidence").innerText=data.confidence;
-
-    document.getElementById("level").innerText=data.level;
-
-    document.getElementById("cause").innerText=data.cause;
-
-    document.getElementById("solution").innerText=data.solution;
-
-    document.getElementById("medicine").innerText=data.medicine;
-
-    document.getElementById("prevent").innerText=data.prevent;
-
-    const image=document.getElementById("resultImage");
-
-    if(image){
-
-        image.src=API_URL+"/uploads/"+response.image;
-
-    }
-
-}
-
-/* ============================================================
-# KÉO THẢ ẢNH
-============================================================ */
-
-const dropArea=document.getElementById("dropArea");
-
-if(dropArea){
-
-dropArea.addEventListener("dragover",(e)=>{
-
-e.preventDefault();
-
-dropArea.classList.add("border-green-600");
-
-});
-
-dropArea.addEventListener("dragleave",()=>{
-
-dropArea.classList.remove("border-green-600");
-
-});
-
-dropArea.addEventListener("drop",(e)=>{
-
-e.preventDefault();
-
-dropArea.classList.remove("border-green-600");
-
-const file=e.dataTransfer.files[0];
-
-if(!file) return;
-
-imageInput.files=e.dataTransfer.files;
-
-previewImage.src=URL.createObjectURL(file);
-
-previewImage.classList.remove("hidden");
-
-});
-
-}
-
-/* ============================================================
-# XÓA KẾT QUẢ
-============================================================ */
-
-const clearButton=document.getElementById("clearResult");
-
-if(clearButton){
-
-clearButton.onclick=()=>{
-
-previewImage.src="";
-
-previewImage.classList.add("hidden");
-
-imageInput.value="";
-
-document.getElementById("resultBox").classList.add("hidden");
-
-};
-
-}
-
-/* ============================================================
-# COPY KẾT QUẢ
-============================================================ */
-
-const copyButton=document.getElementById("copyResult");
-
-if(copyButton){
-
-copyButton.onclick=()=>{
-
-const text=`
-
-Tên bệnh:
-
-${document.getElementById("disease").innerText}
-
-Độ tin cậy:
-
-${document.getElementById("confidence").innerText}
-
-Mức độ:
-
-${document.getElementById("level").innerText}
-
-Nguyên nhân:
-
-${document.getElementById("cause").innerText}
-
-Giải pháp:
-
-${document.getElementById("solution").innerText}
-
-Thuốc:
-
-${document.getElementById("medicine").innerText}
-
-Phòng tránh:
-
-${document.getElementById("prevent").innerText}
-
-`;
-
-navigator.clipboard.writeText(text);
-
-showToast(
-
-"Đã sao chép"
-
-);
-
-};
-
-}
-
-/* ============================================================
-# TẢI LẠI DỮ LIỆU
-============================================================ */
-
-const refreshButton=document.getElementById("refreshHistory");
-
-if(refreshButton){
-
-refreshButton.onclick=async()=>{
-
-await loadHistory();
-
-await updateStatistics();
-
-showToast(
-
-"Đã cập nhật"
-
-);
-
-};
-
-}
-/* ============================================================
-# XÓA TOÀN BỘ LỊCH SỬ
-============================================================ */
-
-const clearHistoryButton=document.getElementById("clearHistory");
-
-if(clearHistoryButton){
-
-clearHistoryButton.onclick=()=>{
-
-Swal.fire({
-
-title:"Xóa toàn bộ lịch sử?",
-
-text:"Bạn sẽ không thể khôi phục.",
-
-icon:"warning",
-
-showCancelButton:true,
-
-confirmButtonText:"Xóa",
-
-cancelButtonText:"Hủy"
-
-}).then(async(result)=>{
-
-if(!result.isConfirmed) return;
-
-await api(
-
-"/api/history",
-
-{
-
-method:"DELETE"
-
-}
-
-);
-
-await loadHistory();
-
-await updateStatistics();
-
-showToast(
-
-"Đã xóa lịch sử"
-
-);
-
-});
-
-};
-
-}
-
-/* ============================================================
-# XUẤT LỊCH SỬ
-============================================================ */
-
-const exportHistory=document.getElementById("exportHistory");
-
-if(exportHistory){
-
-exportHistory.onclick=async()=>{
-
-const response=await api("/api/history");
-
-if(!response.success){
-
-showToast(
-
-"Không có dữ liệu",
-
-"warning"
-
-);
-
-return;
-
-}
-
-const text=JSON.stringify(
-
-response.data,
-
-null,
-
-4
-
-);
-
-const blob=new Blob(
-
-[text],
-
-{
-
-type:"application/json"
-
-}
-
-);
-
-const url=URL.createObjectURL(blob);
-
-const a=document.createElement("a");
-
-a.href=url;
-
-a.download="history.json";
-
-a.click();
-
-URL.revokeObjectURL(url);
-
-showToast(
-
-"Đã xuất lịch sử"
-
-);
-
-};
-
-}
-
-/* ============================================================
-# ĐỔI GIAO DIỆN
-============================================================ */
-
-const themeButton=document.getElementById("themeButton");
-
-if(themeButton){
-
-themeButton.onclick=()=>{
-
-document.body.classList.toggle(
-
-"dark"
-
-);
-
-localStorage.setItem(
-
-"theme",
-
-document.body.classList.contains("dark")
-
-?"dark"
-
-:"light"
-
-);
-
-};
-
-}
-
-window.addEventListener(
-
-"DOMContentLoaded",
-
-()=>{
-
-const theme=localStorage.getItem(
-
-"theme"
-
-);
-
-if(theme==="dark"){
-
-document.body.classList.add(
-
-"dark"
-
-);
-
-}
-
-}
-);
-
-/* ============================================================
-# THỐNG KÊ MỨC ĐỘ BỆNH
-============================================================ */
-
-async function updateLevelStatistics(){
-
-const response=await api("/api/history");
-
-if(!response.success) return;
-
-let light=0;
-
-let medium=0;
-
-let heavy=0;
-
-response.data.forEach(item=>{
-
-switch(item.level){
-
-case"Nhẹ":
-
-light++;
-
-break;
-
-case"Trung bình":
-
-medium++;
-
-break;
-
-case"Nặng":
-
-heavy++;
-
-break;
-
-}
-
-});
-
-const lightBox=document.getElementById("lightCount");
-
-const mediumBox=document.getElementById("mediumCount");
-
-const heavyBox=document.getElementById("heavyCount");
-
-if(lightBox) lightBox.innerText=light;
-
-if(mediumBox) mediumBox.innerText=medium;
-
-if(heavyBox) heavyBox.innerText=heavy;
-
-}
-
-/* ============================================================
-# KHỞI TẠO TOÀN BỘ
-============================================================ */
-
-window.addEventListener(
-
-"DOMContentLoaded",
-
-async()=>{
-
-await loadReviews();
-
-await loadHistory();
-
-await updateStatistics();
-
-await updateLevelStatistics();
-
-}
-);
-/* ============================================================
-# LIKE ĐÁNH GIÁ
-============================================================ */
-
-async function likeReview(id){
-
-    try{
-
-        const result = await api(
-
-            "/api/reviews/"+id+"/like",
-
-            {
-
-                method:"POST"
-
-            }
-
-        );
-
-        if(result.success){
-
-            await loadReviews();
-
-        }
-
-    }
-
-    catch(error){
-
-        console.log(error);
-
-    }
-
-}
-
-/* ============================================================
-# XÓA ĐÁNH GIÁ
-============================================================ */
-
-async function deleteReview(id){
-
-    const confirm = await Swal.fire({
-
-        title:"Xóa đánh giá?",
-
-        text:"Bạn sẽ không thể khôi phục.",
-
-        icon:"warning",
-
-        showCancelButton:true,
-
-        confirmButtonText:"Xóa",
-
-        cancelButtonText:"Hủy"
-
-    });
-
-    if(!confirm.isConfirmed) return;
-
-    try{
-
-        const result = await api(
-
-            "/api/reviews/"+id,
-
-            {
-
-                method:"DELETE"
-
-            }
-
-        );
-
-        if(result.success){
-
-            showToast(
-
-                "Đã xóa"
-
-            );
-
-            await loadReviews();
-
-        }
-
-    }
-
-    catch(error){
-
-        console.log(error);
-
-    }
-
-}
-
-/* ============================================================
-# CHỈNH SỬA ĐÁNH GIÁ
-============================================================ */
-
-async function editReview(review){
-
-    const result = await Swal.fire({
-
-        title:"Chỉnh sửa đánh giá",
-
-        html:`
-
-        <input
-            id="editName"
-            class="swal2-input"
-            value="${review.name}"
-        >
-
-        <textarea
-            id="editContent"
-            class="swal2-textarea"
-        >${review.content}</textarea>
-
-        `,
-
-        focusConfirm:false,
-
-        preConfirm(){
-
-            return{
-
-                name:document.getElementById(
-
-                    "editName"
-
-                ).value,
-
-                content:document.getElementById(
-
-                    "editContent"
-
-                ).value
-
-            };
-
-        }
-
-    });
-
-    if(!result.isConfirmed) return;
-
-    try{
-
-        await api(
-
-            "/api/reviews/"+review.id,
-
-            {
-
-                method:"PUT",
-
-                body:JSON.stringify({
-
-                    name:result.value.name,
-
-                    content:result.value.content
-
-                })
-
-            }
-
-        );
-
-        showToast(
-
-            "Đã cập nhật"
-
-        );
-
-        await loadReviews();
-
-    }
-
-    catch(error){
-
-        console.log(error);
-
-    }
-
-}
-
-/* ============================================================
-# TÌM KIẾM ĐÁNH GIÁ
-============================================================ */
-
-const searchReview = document.getElementById(
-
-    "searchReview"
-
-);
-
-if(searchReview){
-
-searchReview.oninput=()=>{
-
-const keyword=searchReview.value.toLowerCase();
-
-document.querySelectorAll(
-
-"#reviewList .reviewCard"
-
-).forEach(card=>{
-
-const text=card.innerText.toLowerCase();
-
-card.style.display=text.includes(keyword)
-
-?"block"
-
-:"none";
-
-});
-
-};
-
-}
-
-/* ============================================================
-# LỌC THEO SỐ SAO
-============================================================ */
-
-const filterStar=document.getElementById(
-
-"filterStar"
-
-);
-
-if(filterStar){
-
-filterStar.onchange=()=>{
-
-const star=Number(
-
-filterStar.value
-
-);
-
-document.querySelectorAll(
-
-"#reviewList .reviewCard"
-
-).forEach(card=>{
-
-const value=Number(
-
-card.dataset.star
-
-);
-
-if(
-
-star===0||
-
-value===star
-
-){
-
-card.style.display="block";
-
-}
-
-else{
-
-card.style.display="none";
-
-}
-
-});
-
-};
-
-}
-
-/* ============================================================
-# PHÂN TRANG REVIEW
-============================================================ */
-
-let reviewPage=1;
-
-const reviewPerPage=5;
-
-function paginateReviews(list){
-
-const start=(reviewPage-1)*reviewPerPage;
-
-const end=start+reviewPerPage;
-
-return list.slice(start,end);
-
-}
-
-/* ============================================================
-# HIỂN THỊ PHÂN TRANG
-============================================================ */
-
-function renderPagination(total){
-
-const pageBox=document.getElementById(
-
-"reviewPagination"
-
-);
-
-if(!pageBox) return;
-
-pageBox.innerHTML="";
-
-const pages=Math.ceil(
-
-total/reviewPerPage
-
-);
-
-for(let i=1;i<=pages;i++){
-
-pageBox.innerHTML+=`
-
-<button
-
-class="px-3 py-2 border rounded-lg mx-1"
-
-onclick="changeReviewPage(${i})"
-
->
-
-${i}
-
-</button>
-
-`;
-
-}
-
-}
-
-function changeReviewPage(page){
-
-reviewPage=page;
-
-renderReviews();
-
-}
-
-/* ============================================================
-# KẾT THÚC APP.JS
-============================================================ */
-
-console.log(
-
-"🌿 AgroCare AI Ready"
-
-);
-
-/* ============================================
-   XUẤT DỮ LIỆU EXCEL
-============================================ */
-
-const exportExcelButton = document.getElementById("exportExcel");
-
-if (exportExcelButton) {
-
-    exportExcelButton.addEventListener("click", async () => {
-
+    return response;
+  }
+  async function json(url, options, epoch = state.epoch) {
+    const response = await api(url, options, epoch);
+    const data = await response.json(); active(epoch);
+    if (data.success === false) throw new Error(data.error || data.message || 'Yêu cầu thất bại.');
+    return data;
+  }
+  function showQuota() {
+    const q = state.quota;
+    text('quotaStatus', q ? `Còn ${q.remaining}/${q.limit || 10} lượt trong 8 giờ gần nhất.${q.resetAt ? ` Lượt tiếp theo được hoàn lại từ ${dateText(q.resetAt)}.` : ''}` : 'Chưa tải được hạn mức.');
+    updateControls();
+  }
+  async function refreshMe(epoch = state.epoch) {
+    const data = await json('/api/me', undefined, epoch);
+    state.user = data.user; state.quota = data.quota;
+    text('accountEmail', data.user.email);
+    $('adminControls').hidden = !data.user.isAdmin;
+    if (!data.user.isAdmin) { state.scope = ''; $('adminScope').checked = false; }
+    showQuota();
+  }
+  async function refreshData(epoch = state.epoch) {
+    const [history, reviews] = await Promise.all([json(scoped('/api/history'), undefined, epoch), json(scoped('/api/reviews'), undefined, epoch)]);
+    active(epoch); state.history = history.data; state.reviews = reviews.data; state.moreHistory = history.data.length === PAGE_SIZE; state.moreReviews = reviews.data.length === PAGE_SIZE;
+    renderHistory(); renderReviews(); renderStatistics();
+  }
+  async function setSession(session) {
+    const previousId = state.session?.user?.id;
+    state.session = session;
+    if (previousId === session?.user?.id && state.user) { updateControls(); return; }
+    clearPrivate();
+    if (!session) { updateControls(); return; }
+    const epoch = state.epoch;
+    try { await refreshMe(epoch); await refreshData(epoch); message('Đã đăng nhập. Dữ liệu nhận diện chỉ hiển thị cho bạn và quản trị viên.'); }
+    catch (error) { if (error.name !== 'AbortError') message(error.message, true); }
+    updateControls();
+  }
+  function renderHistory() {
+    const keyword = $('searchHistory').value.trim().toLocaleLowerCase('vi');
+    const records = state.history.filter(item => `${item.disease || ''} ${item.solution || ''} ${item.level || ''}`.toLocaleLowerCase('vi').includes(keyword));
+    $('historyList').replaceChildren();
+    if (!records.length) $('historyList').append(node('p', 'Chưa có lịch sử phù hợp.'));
+    for (const item of records) {
+      const card = node('article', '', 'history-card');
+      card.append(node('h3', item.disease || 'Chưa xác định'), node('p', item.level || 'Chưa xác định'), node('small', dateText(item.created_at)), node('p', item.solution || ''));
+      if (state.scope) card.append(node('small', `Tài khoản: ${item.user_id}`));
+      const view = node('button', 'Xem ảnh', 'auth-secondary'); view.type = 'button';
+      const image = document.createElement('img'); image.alt = 'Ảnh của lần nhận diện'; image.hidden = true;
+      view.onclick = async () => {
+        const epoch = state.epoch; view.disabled = true;
         try {
-
-            exportExcelButton.disabled = true;
-
-            exportExcelButton.innerText = "Đang xuất Excel...";
-
-            const response = await fetch(
-                "/api/history/export-excel"
-            );
-
-            if (!response.ok) {
-                throw new Error("Không thể xuất dữ liệu Excel");
-            }
-
-            const blob = await response.blob();
-
-            const url = window.URL.createObjectURL(blob);
-
-            const link = document.createElement("a");
-
-            link.href = url;
-
-            link.download = "AgroCare_AI_Thong_Ke.xlsx";
-
-            document.body.appendChild(link);
-
-            link.click();
-
-            link.remove();
-
-            window.URL.revokeObjectURL(url);
-
-            if (typeof showToast === "function") {
-                showToast("Xuất Excel thành công!");
-            } else {
-                alert("Xuất Excel thành công!");
-            }
-
-        } catch (error) {
-
-            console.error(error);
-
-            alert("Có lỗi khi xuất Excel: " + error.message);
-
-        } finally {
-
-            exportExcelButton.disabled = false;
-
-            exportExcelButton.innerHTML =
-                '<i class="fa-solid fa-file-excel"></i> Xuất Excel';
-
-        }
-
+          const response = await api(`/api/history/${encodeURIComponent(item.id)}/image`, {}, epoch);
+          const blob = await response.blob(); active(epoch);
+          const url = URL.createObjectURL(blob); state.urls.add(url); image.src = url; image.hidden = false; view.hidden = true;
+        } catch (error) { if (error.name !== 'AbortError') { message(error.message, true); view.disabled = false; } }
+      };
+      card.append(view, image); $('historyList').append(card);
+    }
+    if (state.moreHistory) $('historyList').append(loadMoreButton('history'));
+  }
+  function loadMoreButton(kind) {
+    const button = node('button', `Tải thêm ${PAGE_SIZE} bản ghi`, 'auth-secondary');
+    button.type = 'button';
+    button.onclick = () => run(async epoch => {
+      const records = state[kind];
+      const params = new URLSearchParams({ offset: String(records.length) });
+      if (state.scope) params.set('scope', 'all');
+      const result = await json(`/api/${kind}?${params}`, {}, epoch);
+      state[kind] = [...records, ...result.data];
+      if (kind === 'history') { state.moreHistory = result.data.length === PAGE_SIZE; renderHistory(); renderStatistics(); }
+      else { state.moreReviews = result.data.length === PAGE_SIZE; renderReviews(); }
     });
-
-}
+    return button;
+  }
+  function renderStatistics() {
+    const today = new Date().toLocaleDateString('vi-VN');
+    text('totalDetect', state.history.length);
+    text('todayDetect', state.history.filter(item => new Date(item.created_at).toLocaleDateString('vi-VN') === today).length);
+    text('lightCount', state.history.filter(item => item.level === 'Nhẹ').length);
+    text('heavyCount', state.history.filter(item => item.level === 'Nặng').length);
+  }
+  function renderReviews() {
+    const keyword = $('searchReview').value.trim().toLocaleLowerCase('vi');
+    const star = Number($('filterStar').value);
+    const records = state.reviews.filter(item => (!star || item.star === star) && `${item.name} ${item.content}`.toLocaleLowerCase('vi').includes(keyword));
+    $('reviewList').replaceChildren(); $('reviewPagination').replaceChildren();
+    if (!records.length) $('reviewList').append(node('p', 'Chưa có đánh giá phù hợp.'));
+    const avg = state.reviews.length ? state.reviews.reduce((n, item) => n + Number(item.star), 0) / state.reviews.length : 0;
+    text('averageRating', `${avg.toFixed(1)} (${state.reviews.length} đánh giá đã tải)`);
+    for (const item of records) {
+      const card = node('article', '', 'reviewCard');
+      card.append(node('h3', item.name), node('p', '★'.repeat(Math.max(0, Math.min(5, Number(item.star) || 0)))), node('small', dateText(item.created_at)), node('p', item.content));
+      if (state.scope) card.append(node('small', `Tài khoản: ${item.user_id}`));
+      if (own(item)) {
+        const edit = node('button', 'Sửa đánh giá', 'auth-secondary'); edit.type = 'button';
+        edit.onclick = () => run(async epoch => {
+          const name = window.prompt('Tên của bạn (tối đa 80 ký tự)', item.name);
+          if (name === null) return;
+          const content = window.prompt('Nội dung đánh giá (tối đa 2.000 ký tự)', item.content);
+          if (content === null) return;
+          if (!name.trim() || name.trim().length > 80 || !content.trim() || content.trim().length > 2000) throw new Error('Tên hoặc nội dung vượt giới hạn hoặc đang trống.');
+          await json(`/api/reviews/${encodeURIComponent(item.id)}`, { method: 'PUT', body: JSON.stringify({ name: name.trim(), content: content.trim() }) }, epoch);
+          await refreshData(epoch);
+        });
+        const remove = node('button', 'Xóa đánh giá', 'auth-secondary'); remove.type = 'button';
+        remove.onclick = () => run(async epoch => { if (!window.confirm('Xóa đánh giá này?')) return; await json(`/api/reviews/${encodeURIComponent(item.id)}`, { method: 'DELETE' }, epoch); await refreshData(epoch); });
+        card.append(edit, remove);
+      }
+      $('reviewList').append(card);
+    }
+    if (state.moreReviews) $('reviewList').append(loadMoreButton('reviews'));
+  }
+  async function run(action) {
+    if (state.busy) return;
+    const epoch = state.epoch; state.busy = true; updateControls();
+    try { await action(epoch); }
+    catch (error) { if (error.name !== 'AbortError') message(error.message, true); }
+    finally { if (epoch === state.epoch) { state.busy = false; updateControls(); } }
+  }
+  function clearPreview() {
+    if (state.previewUrl) { URL.revokeObjectURL(state.previewUrl); state.previewUrl = null; }
+    $('imageInput').value = ''; $('previewImage').removeAttribute('src'); $('previewImage').classList.add('hidden');
+  }
+  function preview() {
+    const file = $('imageInput').files[0]; if (!file) return;
+    if (file.size > 3 * 1024 * 1024 || !['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)) { clearPreview(); message('Chọn JPEG, PNG, WebP hoặc GIF tối đa 3 MiB.', true); return; }
+    if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
+    state.previewUrl = URL.createObjectURL(file); $('previewImage').src = state.previewUrl; $('previewImage').classList.remove('hidden');
+  }
+  function download(blob, filename) {
+    const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = filename;
+    document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function authAction(kind) {
+    if (state.authBusy || !state.client) return;
+    state.authBusy = true; updateControls();
+    const email = $('authEmail').value.trim(); const password = $('authPassword').value;
+    try {
+      let result;
+      if (kind === 'signOut') {
+        state.session = null; clearPrivate(); result = await state.client.auth.signOut({ scope: 'local' });
+      } else if (kind === 'resetPassword') {
+        if (!$('authEmail').checkValidity() || !email) throw new Error('Nhập email hợp lệ để nhận liên kết đặt lại mật khẩu.');
+        result = await state.client.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+      } else {
+        if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
+        if (kind !== 'updatePassword' && (!$('authEmail').checkValidity() || !email)) throw new Error('Nhập email hợp lệ.');
+        if (kind === 'signIn') result = await state.client.auth.signInWithPassword({ email, password });
+        if (kind === 'signUp') result = await state.client.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
+        if (kind === 'updatePassword') result = await state.client.auth.updateUser({ password });
+      }
+      if (result.error) throw result.error;
+      $('authPassword').value = '';
+      if (kind === 'signUp') message('Kiểm tra email để xác nhận tài khoản trước khi đăng nhập.');
+      if (kind === 'resetPassword') message('Nếu email hợp lệ, liên kết đặt lại mật khẩu sẽ được gửi đến hộp thư.');
+      if (kind === 'updatePassword') { state.recovery = false; message('Đã đổi mật khẩu.'); }
+      if (kind === 'signOut') message('Đã đăng xuất.');
+      if (kind === 'signIn' || (kind === 'signUp' && result.data?.session)) await setSession(result.data.session);
+    } catch (error) { message(error.message || 'Không thể đăng nhập.', true); }
+    finally { state.authBusy = false; updateControls(); }
+  }
+  async function init() {
+    clearPrivate();
+    for (const kind of ['signIn','signUp','signOut','resetPassword','updatePassword']) $(kind).onclick = () => authAction(kind);
+    $('authForm').onsubmit = event => { event.preventDefault(); void authAction(state.recovery ? 'updatePassword' : 'signIn'); };
+    $('imageInput').onchange = preview;
+    $('dropArea').ondragover = event => event.preventDefault();
+    $('dropArea').ondrop = event => { event.preventDefault(); if (event.dataTransfer.files.length) { $('imageInput').files = event.dataTransfer.files; preview(); } };
+    $('clearResult').onclick = () => { clearPreview(); $('resultBox').classList.add('hidden'); };
+    $('copyResult').onclick = async () => { try { await navigator.clipboard.writeText(['disease','confidence','level','cause','solution','medicine','prevent'].map(id => $(id).textContent).join('\n')); message('Đã sao chép kết quả.'); } catch { message('Trình duyệt không cho phép sao chép.', true); } };
+    $('detectButton').onclick = () => run(async epoch => {
+      const file = $('imageInput').files[0]; if (!file) throw new Error('Vui lòng chọn ảnh.');
+      const form = new FormData(); form.append('image', file); message('Đang phân tích ảnh…');
+      try {
+        const result = await json('/api/detect', { method: 'POST', body: form }, epoch);
+        let data; try { data = typeof result.result === 'string' ? JSON.parse(result.result) : result.result; } catch { throw new Error('Kết quả AI không đúng định dạng.'); }
+        for (const field of ['disease','confidence','level','cause','solution','medicine','prevent']) text(field, data?.[field] ?? 'Chưa xác định');
+        $('resultBox').classList.remove('hidden');
+        $('resultImage').removeAttribute('src');
+        if (result.historyId) {
+          const response = await api(`/api/history/${encodeURIComponent(result.historyId)}/image`, {}, epoch);
+          const blob = await response.blob(); active(epoch); const url = URL.createObjectURL(blob); state.urls.add(url); $('resultImage').src = url;
+        }
+        await refreshData(epoch); message('Đã phân tích và lưu vào lịch sử riêng của bạn.');
+      } finally { if (epoch === state.epoch && state.session) await refreshMe(epoch); }
+    });
+    $('refreshHistory').onclick = () => run(async epoch => { await refreshMe(epoch); await refreshData(epoch); message('Đã cập nhật.'); });
+    $('adminScope').onchange = () => run(async epoch => { state.scope = state.user?.isAdmin && $('adminScope').checked ? 'all' : ''; releaseImages(); $('historyList').replaceChildren(); $('reviewList').replaceChildren(); await refreshData(epoch); });
+    $('searchHistory').oninput = renderHistory; $('searchReview').oninput = renderReviews; $('filterStar').onchange = renderReviews;
+    $('clearHistory').onclick = () => run(async epoch => { if (state.scope || !window.confirm('Xóa toàn bộ lịch sử của riêng bạn?')) return; await json('/api/history', { method: 'DELETE' }, epoch); await refreshData(epoch); message('Đã xóa lịch sử của bạn.'); });
+    $('exportHistory').onclick = () => run(async epoch => {
+      const records = [];
+      while (true) {
+        const params = new URLSearchParams({ offset: String(records.length) });
+        if (state.scope) params.set('scope', 'all');
+        const data = await json(`/api/history?${params}`, {}, epoch);
+        records.push(...data.data);
+        if (records.length > JSON_EXPORT_LIMIT) throw new Error('Lịch sử vượt 10.000 bản ghi. Chưa xuất file; vui lòng liên hệ quản trị viên để xuất toàn bộ dữ liệu.');
+        if (data.data.length < PAGE_SIZE) break;
+      }
+      active(epoch);
+      download(new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' }), 'history.json');
+    });
+    $('exportExcel').onclick = () => run(async epoch => { const response = await api(scoped('/api/history/export-excel'), {}, epoch); const blob = await response.blob(); active(epoch); download(blob, 'AgroCare_AI_Thong_Ke.xlsx'); message('Đã xuất tối đa 20 lần phân tích gần nhất.'); });
+    $('sendReview').onclick = () => run(async epoch => {
+      const name = $('reviewName').value.trim(); const content = $('reviewContent').value.trim(); const star = Number($('reviewStar').value);
+      if (!name || name.length > 80 || !content || content.length > 2000 || !Number.isInteger(star) || star < 1 || star > 5) throw new Error('Nhập tên (1–80 ký tự), đánh giá (1–2.000 ký tự) và 1–5 sao.');
+      await json('/api/reviews', { method: 'POST', body: JSON.stringify({ name, star, content }) }, epoch);
+      $('reviewContent').value = ''; await refreshData(epoch); message('Đã lưu đánh giá riêng của bạn.');
+    });
+    $('themeButton').onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light'); };
+    if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+    try {
+      const response = await fetch('/api/config', { cache: 'no-store' }); const config = await response.json();
+      if (!response.ok || !config.supabaseUrl || !config.supabaseAnonKey) throw new Error('Ứng dụng chưa được cấu hình đăng nhập. Vui lòng liên hệ quản trị viên.');
+      state.client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+      state.client.auth.onAuthStateChange((event, session) => {
+        // Supabase callbacks must not await another auth call inside the callback.
+        setTimeout(async () => {
+          await setSession(session);
+          if (event === 'PASSWORD_RECOVERY' && session && state.session?.user?.id === session.user.id) state.recovery = true;
+          updateControls();
+        }, 0);
+      });
+      const { data, error } = await state.client.auth.getSession(); if (error) throw error;
+      await setSession(data.session);
+    } catch (error) { message(error.message, true); }
+  }
+  window.agroReady = init();
+})();

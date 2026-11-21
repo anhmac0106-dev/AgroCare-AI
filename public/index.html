@@ -91,6 +91,31 @@ MAIN
 ======================================================= -->
 
 <main class="max-w-7xl mx-auto p-8">
+<section id="account" class="auth-card" aria-labelledby="accountTitle">
+  <h2 id="accountTitle">Tài khoản AgroCare AI</h2>
+  <p>Lịch sử và ảnh phân tích là dữ liệu riêng của bạn; quản trị viên có quyền xem để hỗ trợ.</p>
+  <form id="authForm" class="auth-form">
+    <label for="authEmail">Email</label>
+    <input id="authEmail" type="email" autocomplete="email" maxlength="254" required>
+    <label for="authPassword">Mật khẩu</label>
+    <input id="authPassword" type="password" autocomplete="current-password" minlength="8" maxlength="128" required>
+    <p class="auth-help">Mật khẩu ít nhất 8 ký tự. Đăng ký mới cần xác nhận qua email.</p>
+    <div class="auth-actions">
+      <button id="signIn" type="submit">Đăng nhập</button>
+      <button id="signUp" type="button" class="auth-secondary">Đăng ký</button>
+      <button id="resetPassword" type="button" class="auth-secondary">Quên mật khẩu</button>
+      <button id="updatePassword" type="button" hidden>Lưu mật khẩu mới</button>
+    </div>
+  </form>
+  <div id="signedInPanel" hidden>
+    <p>Đã đăng nhập: <strong id="accountEmail"></strong></p>
+    <button id="signOut" type="button" class="auth-secondary">Đăng xuất</button>
+  </div>
+  <p id="quotaStatus" class="quota-status"></p>
+  <p class="auth-help">Mỗi tài khoản có 10 lượt trong 8 giờ gần nhất. Lượt đã gửi tới AI vẫn được tính nếu nhà cung cấp gặp lỗi.</p>
+  <label id="adminControls" hidden><input id="adminScope" type="checkbox"> Quản trị: xem lịch sử và đánh giá của tất cả người dùng (chỉ đọc)</label>
+  <p id="appMessage" role="status" aria-live="polite"></p>
+</section>
 
 <!-- =======================================================
 GIỚI THIỆU
@@ -132,7 +157,7 @@ class="bg-white rounded-3xl shadow p-6 text-center">
 <h3
 class="mt-4 text-gray-500">
 
-Tổng lượt nhận diện
+Lượt nhận diện đã tải
 
 </h3>
 
@@ -154,7 +179,7 @@ class="bg-white rounded-3xl shadow p-6 text-center">
 <h3
 class="mt-4 text-gray-500">
 
-Hôm nay
+Hôm nay (đã tải)
 
 </h3>
 
@@ -176,7 +201,7 @@ class="bg-white rounded-3xl shadow p-6 text-center">
 <h3
 class="mt-4 text-gray-500">
 
-Bệnh nhẹ
+Bệnh nhẹ (đã tải)
 
 </h3>
 
@@ -198,7 +223,7 @@ class="bg-white rounded-3xl shadow p-6 text-center">
 <h3
 class="mt-4 text-gray-500">
 
-Bệnh nặng
+Bệnh nặng (đã tải)
 
 </h3>
 
@@ -268,7 +293,7 @@ type="file"
 
 id="imageInput"
 
-accept="image/*"
+accept="image/jpeg,image/png,image/webp,image/gif"
 
 hidden>
 
@@ -568,7 +593,7 @@ Xuất JSON
 
     <i class="fa-solid fa-file-excel"></i>
 
-    Xuất Excel
+    Xuất Excel (20 gần nhất)
 
 </button>
 
@@ -727,7 +752,7 @@ id="reviewName"
 
 class="w-full border rounded-xl p-4 mb-4"
 
-placeholder="Tên của bạn">
+placeholder="Tên của bạn" maxlength="80">
 
 <select
 
@@ -775,7 +800,7 @@ rows="5"
 
 class="w-full border rounded-xl p-4 mb-5"
 
-placeholder="Nhập đánh giá của bạn...">
+placeholder="Nhập đánh giá của bạn..." maxlength="2000">
 
 </textarea>
 
@@ -919,7 +944,8 @@ Việt Nam
 
 </main>
 
-<script src="app.js"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/app.js"></script>
 
 </body>
 

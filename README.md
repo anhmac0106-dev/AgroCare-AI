@@ -1,26 +1,26 @@
 # AgroCare AI
 
-Ứng dụng web tiếng Việt hỗ trợ phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử nhận diện và xuất báo cáo Excel có ảnh. Backend dùng Node.js/Express, dữ liệu lưu trong SQLite, giao diện HTML/CSS/JavaScript được phục vụ trực tiếp bởi server.
+Ứng dụng web tiếng Việt phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử riêng theo tài khoản và xuất Excel có ảnh. Phiên bản này được chuẩn bị cho **Vercel + Supabase**: Express chạy API, Supabase cung cấp đăng nhập email/mật khẩu, Postgres và kho ảnh riêng tư.
+
+**Chưa thể xem việc chạy test cục bộ là xác nhận website đã được triển khai.** Cần tạo dịch vụ, cấu hình SMTP/biến môi trường và kiểm tra trên cloud theo [hướng dẫn triển khai](docs/DEPLOYMENT.md).
 
 ## Chức năng
 
-- Chọn hoặc kéo thả ảnh, xem trước và gửi phân tích AI.
-- Hiển thị tên bệnh, độ tin cậy do AI trả về, mức độ, nguyên nhân, hướng xử lý, thuốc đề xuất và cách phòng tránh.
-- Sao chép kết quả, xem và tìm kiếm lịch sử, xuất JSON hoặc Excel, xóa toàn bộ lịch sử.
-- Nhúng ảnh của từng lần phân tích vào đúng dòng trong file Excel; ảnh được thu nhỏ và giữ tỷ lệ.
-- Gửi và xem đánh giá, tính điểm sao trung bình; backend có API sửa, xóa và thích đánh giá.
-- Giao diện sáng/tối, lưu lựa chọn trong localStorage.
+- Đăng ký, xác nhận email, đăng nhập, khôi phục mật khẩu và đăng xuất qua Supabase Auth.
+- Chọn hoặc kéo thả ảnh để nhận diện; xem tên bệnh, độ tin cậy do AI trả về, mức độ, nguyên nhân, hướng xử lý và cách phòng tránh.
+- Mỗi tài khoản có tối đa **10 lượt nhận diện trong 8 giờ gần nhất**. Hạn mức được lưu và kiểm tra trong database, không phụ thuộc một phiên server.
+- Lịch sử và ảnh riêng theo người dùng. Quản trị viên có chế độ **xem toàn bộ**, không có quyền sửa/xóa dữ liệu của người khác qua API ứng dụng.
+- Tìm kiếm lịch sử, xem ảnh bằng API có xác thực, xuất JSON và Excel nhúng ảnh đúng dòng.
+- Tạo, xem, sửa, xóa đánh giá của chính mình; admin có thể xem đánh giá toàn bộ.
+- Kiểm tra đầu vào ở backend, giải mã ảnh thật trước khi gửi AI, giới hạn kích thước và hiển thị nội dung người dùng/AI bằng text để tránh thực thi HTML.
+- Giao diện sáng/tối.
 
-## Yêu cầu
+## Yêu cầu và cài đặt
 
-- Node.js và npm. Dependency `sharp` trong lockfile yêu cầu Node.js **>= 20.9.0**; dự án đã được kiểm tra trên Node.js **26.13.0**.
-- Khóa DeepSeek API để chạy nhận diện ảnh. Không cần khóa để khởi động server hoặc chạy test.
-- Internet để gọi DeepSeek và tải tài nguyên giao diện từ CDN: Tailwind CSS, SweetAlert2, Font Awesome, Google Fonts.
-- Quyền ghi vào thư mục dự án để tạo database và lưu ảnh.
-
-Nên đặt dự án trên ổ đĩa cục bộ, ví dụ `C:\Carrot-Project\AgroCare-AI`. Thư mục đồng bộ Google Drive từng gây lỗi ghi file khi cài `node_modules` trên môi trường phát triển này.
-
-## Cài đặt và chạy
+- **Node.js 26.x** theo `engines` trong `package.json` và cấu hình Vercel, npm và Git. Môi trường kiểm tra cục bộ dùng Node.js 26.13.0.
+- Project Supabase đã chạy migration, bật Email Auth và có bucket riêng tư.
+- DeepSeek API key cho nhận diện. Các test mock không cần gọi DeepSeek thật.
+- Internet để dùng Auth, Storage, AI và các CDN giao diện.
 
 ```sh
 git clone https://github.com/anhmac0106-dev/AgroCare-AI.git
@@ -28,162 +28,129 @@ cd AgroCare-AI
 npm ci
 ```
 
-Tạo cấu hình **một lần**, không ghi đè `.env` đã có khóa của bạn.
-
-Windows PowerShell:
+Tạo `.env` một lần, không ghi đè file cấu hình đã có khóa thật:
 
 ```powershell
+# Windows PowerShell
 Copy-Item .env.example .env
 ```
 
-macOS/Linux:
-
 ```sh
+# macOS/Linux
 cp .env.example .env
 ```
 
-Điền khóa trong `.env`:
-
-```dotenv
-PORT=3000
-DEEPSEEK_API_KEY=your_deepseek_api_key
-DEEPSEEK_MODEL=deepseek-flash
-```
+Điền cấu hình rồi chạy:
 
 ```sh
 npm start
 ```
 
-Mở [http://localhost:3000](http://localhost:3000). Luôn chạy lệnh từ thư mục gốc dự án vì đường dẫn `public`, `database` và `uploads` hiện được tính theo thư mục làm việc. Không mở `public/index.html` trực tiếp bằng `file://`.
+Mở [http://localhost:3000](http://localhost:3000), không mở trực tiếp file HTML. Frontend gọi API cùng origin, không còn cố định `localhost:3000` trong request.
 
 | Lệnh | Công dụng |
 | --- | --- |
-| `npm ci` | Cài dependency theo `package-lock.json` |
-| `npm start` | Chạy `node server.js` |
-| `npm run dev` | Chạy với nodemon, tự khởi động lại khi mã nguồn thay đổi |
-| `npm test` | Chạy test bằng Node.js test runner |
-
-Không có bước build frontend. Sau khi sửa backend hoặc `.env`, khởi động lại server; sau khi sửa frontend, tải lại trang bằng Ctrl + F5 nếu trình duyệt còn dùng bản cũ.
+| `npm ci` | Cài đúng dependency trong lockfile |
+| `npm start` | Chạy server cục bộ |
+| `npm run dev` | Chạy nodemon tự khởi động lại khi sửa code |
+| `npm test` | Chạy bộ test Node.js |
 
 ## Cấu hình
 
-| Biến | Mặc định | Ý nghĩa |
-| --- | --- | --- |
-| `PORT` | `3000` | Cổng HTTP của Express |
-| `DEEPSEEK_API_KEY` | Trống | Bắt buộc khi gọi nhận diện; chỉ được đọc ở backend |
-| `DEEPSEEK_MODEL` | `deepseek-flash` | Tên model gửi tới DeepSeek; cấu hình hiện tại dùng V4.1 Flash |
-
-Endpoint được đặt trong `deepseek.js`: `https://api.deepseek.com/chat/completions`. Request gồm prompt tiếng Việt và ảnh base64, yêu cầu JSON, tắt thinking, giới hạn đầu ra 4.096 token và timeout 120 giây.
-
-**Đổi cổng hoặc triển khai lên máy khác:** `API_URL` trong `public/app.js` hiện cố định là `http://localhost:3000`. Cần cập nhật địa chỉ này tương ứng với backend. Riêng nút xuất Excel gọi đường dẫn cùng origin `/api/history/export-excel`.
-
-## Cách sử dụng
-
-1. Mở ứng dụng, chọn ảnh hoặc kéo ảnh vào vùng tải lên.
-2. Dùng JPEG, PNG, GIF hoặc WebP; giới hạn upload là **10 MiB/ảnh**.
-3. Bấm **Nhận diện bằng AI**, chờ kết quả và lịch sử được cập nhật.
-4. Bấm **Xuất JSON** để tải `history.json`, hoặc **Xuất Excel** để tải `AgroCare_AI_Thong_Ke.xlsx`.
-
-Báo cáo Excel gồm STT, tên bệnh, mức độ, hướng xử lý, hình ảnh và thời gian. Ảnh được chuyển thành thumbnail PNG, nhúng trong workbook và neo vào dòng tương ứng ở cột E. File Excel có thể xem ảnh mà không cần kết nối lại server. Nếu ảnh gốc mất hoặc không đọc được, ô ảnh hiển thị thông báo thay vì làm hỏng toàn bộ báo cáo.
-
-## Luồng xử lý
-
-```mermaid
-sequenceDiagram
-    participant UI as Trình duyệt
-    participant API as Express
-    participant AI as DeepSeek
-    participant DB as SQLite
-    UI->>API: POST /api/detect (image)
-    API->>API: Lưu ảnh vào uploads/
-    API->>AI: Prompt + ảnh base64
-    AI-->>API: Nội dung JSON dạng chuỗi
-    API-->>UI: success, image, result
-    UI->>UI: Parse result và hiển thị
-    UI->>API: POST /api/history
-    API->>DB: Lưu tên ảnh, bệnh, giải pháp, mức độ
-    UI->>API: GET /api/history
-    API-->>UI: Danh sách lịch sử
+```dotenv
+PORT=3000
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-flash
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+ADMIN_USER_IDS=
 ```
 
-`POST /api/detect` **không tự lưu lịch sử**. Frontend thực hiện bước lưu riêng sau khi nhận diện thành công. Nếu tích hợp client khác, cần thực hiện cả hai request.
+| Biến | Ý nghĩa |
+| --- | --- |
+| `PORT` | Cổng chạy cục bộ, mặc định 3000 |
+| `DEEPSEEK_API_KEY` | Khóa bí mật, chỉ dùng ở backend |
+| `DEEPSEEK_MODEL` | Mặc định `deepseek-flash` |
+| `SUPABASE_URL` | URL project Supabase |
+| `SUPABASE_ANON_KEY` | Public key phục vụ client đăng nhập |
+| `SUPABASE_SERVICE_ROLE_KEY` | Khóa đặc quyền, **tuyệt đối không đưa vào frontend hoặc Git** |
+| `ADMIN_USER_IDS` | UUID Supabase Auth của admin, phân tách bằng dấu phẩy; trống là không có admin |
+
+Quyền admin do server xác định từ `ADMIN_USER_IDS`, không nhận từ form hoặc metadata người dùng. Khóa thật nằm trong `.env` cục bộ hoặc Vercel Environment Variables; `.env.example` chỉ chứa mẫu trống.
+
+## Chuẩn bị Supabase và Vercel
+
+1. Tạo project Supabase mới và chạy [SQL migration](supabase/migrations/202611210001_private_users.sql).
+2. Bật Email Auth, giữ xác nhận email và cấu hình Custom SMTP. SMTP mặc định Supabase chỉ gửi đến email thuộc nhóm project, không phù hợp mở đăng ký đại trà.
+3. Tạo deployment Vercel từ GitHub với `vercel.json` đi kèm, điền biến môi trường.
+4. Cập nhật Site URL và redirect allowlist trong Supabase bằng URL chính thức.
+5. Đăng ký tài khoản admin, lấy UUID Auth và thêm vào `ADMIN_USER_IDS`, rồi redeploy.
+6. Kiểm tra bằng ít nhất hai tài khoản thường và một admin trước khi mở public.
+
+Các bước cụ thể, điều kiện gói miễn phí, SMTP, SQL test và nghiệm thu nằm trong [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Vercel Hobby chỉ phù hợp mục đích cá nhân phi thương mại; Supabase Free có giới hạn và có thể pause khi không hoạt động. **Phí DeepSeek vẫn tính riêng.**
+
+## Quy tắc nhận diện và hạn mức
+
+- JPEG, PNG, GIF, WebP; tối đa **3 MiB**, tối đa **25 triệu pixel**.
+- Backend đọc nội dung ảnh thực, chuẩn hóa thành JPEG và thu nhỏ trước khi gửi DeepSeek/lưu Storage.
+- Ảnh sai bị chặn trước khi giữ lượt. Khi bắt đầu gọi AI, lượt đã tính; lỗi AI vẫn tiêu thụ lượt để tránh retry không giới hạn.
+- Quota là cửa sổ trượt 8 giờ, áp dụng cả admin. `resetAt` là thời điểm lượt cũ nhất hết hạn, không phải thời điểm hồi đồng loạt đủ 10 lượt.
+- SQL dùng khóa transaction theo user để chặn vượt hạn mức khi gửi nhiều request đồng thời qua các instance Vercel.
+- Thành công: backend **tự lưu lịch sử**, sau đó trả kết quả. Client không gọi `POST /api/history` để ghi kết quả tùy ý.
+
+Ảnh lưu trong bucket `plant-images` riêng tư. Browser tải ảnh qua endpoint có bearer token, không dùng public bucket hoặc URL công khai. Admin chỉ được đọc ảnh sau khi server xác định quyền.
 
 ## API
 
-Các request JSON dùng `Content-Type: application/json`. Ngoại lệ: nhận diện dùng `multipart/form-data` và xuất Excel trả dữ liệu nhị phân.
+Ngoại trừ `/api/ping` và `/api/config`, các API dưới đây yêu cầu `Authorization: Bearer <access_token>` của phiên Supabase hợp lệ. Không đưa access token vào query string.
 
-| Method | Endpoint | Dữ liệu / công dụng |
+| Method | Endpoint | Công dụng |
 | --- | --- | --- |
-| GET | `/api/ping` | Kiểm tra server; trả `success`, `message` |
-| GET | `/api/check-ai` | Trả `ai: true` nếu có khóa khác rỗng; không gọi DeepSeek để xác thực |
-| POST | `/api/detect` | File trong field `image`; trả `success`, `image`, `result` |
-| POST | `/api/history` | JSON: `image`, `disease`, `solution`, `level`; trả ID bản ghi |
-| GET | `/api/history` | Lịch sử mới nhất trước, trong `data` |
-| DELETE | `/api/history` | Xóa tất cả bản ghi lịch sử, không xóa file ảnh |
-| GET | `/api/history/export-excel` | Tải workbook `.xlsx` có ảnh |
-| GET | `/api/statistics` | `statistics`: `total`, `light`, `medium`, `heavy` |
-| POST | `/api/reviews` | JSON: `name`, `star`, `content` |
-| GET | `/api/reviews` | Danh sách đánh giá mới nhất trước |
-| PUT | `/api/reviews/:id` | Cập nhật `name`, `content`; không cập nhật số sao |
-| DELETE | `/api/reviews/:id` | Xóa một đánh giá |
-| POST | `/api/reviews/:id/like` | Tăng số lượt thích |
+| GET | `/api/ping` | Kiểm tra server |
+| GET | `/api/config` | Chỉ trả Supabase URL và public key |
+| GET | `/api/me` | Tài khoản, quyền admin và quota |
+| GET | `/api/check-ai` | Kiểm tra có cấu hình khóa AI; không xác thực khóa với nhà cung cấp |
+| POST | `/api/detect` | Multipart field `image`; phân tích và tự lưu lịch sử |
+| GET | `/api/history` | Tối đa 100 dòng lịch sử, mới nhất trước |
+| GET | `/api/history/:id/image` | Ảnh riêng tư; chủ sở hữu hoặc admin được xem |
+| GET | `/api/history/export-excel` | Tối đa 20 dòng mỗi lần xuất, có ảnh nhúng |
+| DELETE | `/api/history` | Xóa lịch sử của chính mình và dọn ảnh tương ứng |
+| GET | `/api/statistics` | Thống kê trên tối đa 100 dòng được truy vấn |
+| GET | `/api/reviews` | Tối đa 100 đánh giá |
+| POST | `/api/reviews` | Tạo đánh giá: `name`, `star` (1–5), `content` |
+| PUT | `/api/reviews/:id` | Sửa `name`, `content` của đánh giá do mình tạo |
+| DELETE | `/api/reviews/:id` | Xóa đánh giá do mình tạo |
 
-Ví dụ gọi nhận diện trong PowerShell:
+API danh sách, thống kê và Excel hỗ trợ `offset` không âm. Ví dụ `/api/history?offset=100` lấy trang tiếp theo; `/api/history/export-excel?offset=20` xuất nhóm 20 dòng tiếp theo. Admin thêm `scope=all` để đọc toàn bộ theo từng trang; người dùng thường nhận 403 khi yêu cầu scope này. Thao tác xóa lịch sử không nhận scope toàn bộ.
 
-```powershell
-curl.exe -X POST http://localhost:3000/api/detect -F "image=@C:/Images/leaf.jpg"
-```
+`POST /api/history` trả 405 vì lịch sử chỉ được tạo từ nhận diện thành công. API like đánh giá cũ không còn được hỗ trợ.
 
-Dạng phản hồi thành công (minh họa):
+Phản hồi nhận diện gồm `success`, `historyId`, `image` (khóa object riêng tư), `result` (chuỗi JSON) và `quota`. Các trường đã parse được lưu thêm trong cột `result` của lịch sử; API danh sách không trả toàn bộ cột JSON này để giữ phản hồi gọn. Hết hạn mức trả HTTP 429 cùng quota và `Retry-After`.
 
-```json
-{
-  "success": true,
-  "image": "1795272586956.jpg",
-  "result": "{\"disease\":\"Tên bệnh\",\"confidence\":\"--\",\"level\":\"Nhẹ\",\"cause\":\"...\",\"solution\":\"...\",\"medicine\":\"...\",\"prevent\":\"...\"}"
-}
-```
+## Xuất báo cáo
 
-`result` là **chuỗi JSON**, cần `JSON.parse` trước khi lấy các trường để lưu. API hiện không kiểm tra đầy đủ schema kết quả AI hoặc dữ liệu ghi lịch sử. Thiếu file nhận diện trả HTTP 400; lỗi phân tích được trả HTTP 500 với trường `error`. Lỗi upload từ middleware có thể có định dạng phản hồi khác.
+Excel có STT, tên bệnh, mức độ, hướng xử lý, hình ảnh và thời gian. Ảnh được nhúng trong workbook, giữ tỷ lệ và neo tại dòng tương ứng; mở file không cần tải lại ảnh từ server.
 
-## Cấu trúc dự án
+Mỗi request xuất tối đa **20 dòng**; workbook vượt **4 MiB** bị từ chối để phù hợp giới hạn phản hồi của Vercel. JSON là dữ liệu lịch sử đã tải, không kèm file ảnh. Tìm kiếm và thống kê giao diện chỉ phản ánh các dòng đang tải, không phải truy vấn toàn bộ dữ liệu trên server.
+
+## Cấu trúc mã nguồn
 
 ```text
-AgroCare-AI/
-├── server.js                # Express, upload, API và static files
-├── database.js              # Kết nối SQLite, tạo bảng khi chạy
-├── deepseek.js              # Gửi ảnh và prompt tới DeepSeek
-├── prompt.js                # Prompt và các trường kết quả mong muốn
-├── history-export.js        # Tạo Excel, xử lý và nhúng ảnh
-├── public/
-│   ├── index.html           # Giao diện tiếng Việt
-│   ├── app.js               # Request API, kết quả, lịch sử, đánh giá
-│   └── style.css            # Kiểu dáng, responsive, dark mode
-├── deepseek.test.js         # Request ảnh và xử lý lỗi AI
-├── history.test.js          # Parse kết quả trước khi lưu lịch sử
-├── history-export.test.js   # Ảnh trong workbook và trường hợp thiếu ảnh
-├── .env.example             # Mẫu cấu hình, không chứa khóa thật
-├── .gitignore
-├── package.json
-├── package-lock.json
-├── database/agrocare.db     # Tự tạo, không theo dõi trong Git
-└── uploads/                 # Ảnh upload, tự tạo, không theo dõi trong Git
+server.js                         # Entry point local/Vercel, cấu hình Supabase
+backend.js                        # createApp, auth, scope, validation, quota và API
+public/index.html                 # Giao diện và form tài khoản
+public/app.js                     # Auth, request có token, DOM an toàn, lịch sử
+public/style.css                  # Kiểu dáng
+supabase/migrations/               # Schema, RLS, bucket và quota RPC
+supabase/tests/                    # Test SQL/quota đồng thời cần Postgres thật
+history-export.js                 # Excel và thumbnail nhúng
+prompt.js                         # Prompt phân tích ảnh
+deepseek.js                       # DeepSeek client
+*.test.js                         # Test ứng dụng
+vercel.json                       # Cấu hình triển khai
+.env.example                      # Mẫu biến môi trường
 ```
-
-## Dữ liệu và sao lưu
-
-SQLite có hai bảng:
-
-| Bảng | Các cột |
-| --- | --- |
-| `history` | `id`, `image`, `disease`, `solution`, `level`, `created_at` |
-| `reviews` | `id`, `name`, `star`, `content`, `likes`, `created_at` |
-
-Lịch sử không lưu toàn bộ kết quả AI: `confidence`, `cause`, `medicine`, `prevent` chỉ hiện ở kết quả hiện tại. Thời gian mặc định do SQLite tạo bằng `CURRENT_TIMESTAMP` (UTC); giao diện hiện chưa chuyển nhất quán sang múi giờ địa phương.
-
-Để sao lưu đơn giản, dừng server rồi sao chép **cả** `database/` và `uploads/`. Khôi phục cả hai vào cùng dự án trước khi chạy lại. Xuất JSON không kèm file ảnh và chưa có chức năng nhập lại JSON.
-
-`.env`, `node_modules`, database, uploads, cache npm, `%LocalAppData%`, log và file tạm được ignore. Chỉ commit `.env.example` với khóa trống. Việc bỏ theo dõi dữ liệu không xóa các phiên bản đã nằm trong lịch sử Git.
 
 ## Kiểm thử
 
@@ -191,32 +158,30 @@ Lịch sử không lưu toàn bộ kết quả AI: `confidence`, `cause`, `medic
 npm test
 ```
 
-Bộ test hiện kiểm tra request ảnh và lỗi DeepSeek bằng mock; việc trích xuất trường JSON để lưu lịch sử; xuất rồi đọc lại Excel để kiểm tra tiêu đề, ảnh neo tại cột E, ảnh bị thiếu và tên ảnh không hợp lệ. Test dùng dữ liệu tạm, không cần khóa thật và không gọi DeepSeek thực tế.
+Các test ứng dụng dùng mock cho dịch vụ bên ngoài, kiểm tra API xác thực/phân quyền, nhận diện/quota, xử lý nội dung, frontend và Excel. Không cần khóa AI thật cho test mock.
 
-Chưa có bộ kiểm thử trình duyệt end-to-end hay kiểm thử chất lượng chẩn đoán AI.
+**SQL chưa được chứng minh bằng test mock.** Chạy `supabase/tests/quota.sql` và `quota-concurrency.mjs` theo [hướng dẫn kiểm tra](docs/DEPLOYMENT.md#7-kiểm-tra-bắt-buộc-trước-khi-mở-public) trên project Supabase thử nghiệm. Cần xác nhận 20 request đồng thời chỉ nhận đúng 10 lượt, RLS/private bucket có hiệu lực và người B không truy cập được dữ liệu của người A.
 
-## Giới hạn hiện tại
+## Dữ liệu cũ và vận hành
 
-- Chưa có đăng nhập, phân quyền, rate limit hoặc giới hạn CORS theo domain. API sửa/xóa dữ liệu và ảnh tại `/uploads` đang truy cập được mà không cần xác thực. Cần bổ sung các phần này trước khi triển khai công khai.
-- Một số dữ liệu lịch sử/đánh giá được chèn bằng `innerHTML`; cần xử lý nội dung không tin cậy trước khi mở cho nhiều người dùng.
-- Frontend có một số hàm và sự kiện khởi tạo lặp. Bộ lọc/tìm kiếm đánh giá dùng `.reviewCard` nhưng renderer hiện chưa tạo class này; phân trang và các thao tác sửa/xóa/thích chưa được nối đầy đủ vào danh sách hiển thị.
-- Thống kê “Hôm nay” so sánh chuỗi ngày theo locale với timestamp SQLite nên có thể không chính xác; các ô thống kê chưa được cập nhật đồng bộ sau mỗi lần nhận diện.
-- File upload có thể còn lại sau khi phân tích thất bại hoặc khi xóa lịch sử; chưa có tác vụ dọn ảnh tự động.
-- Giá trị độ tin cậy hiển thị là nội dung AI sinh ra, chưa phải chỉ số đã được đánh giá trên tập dữ liệu của dự án.
+SQLite `database/agrocare.db` và ảnh trong `uploads/` của bản cũ không còn được API cloud sử dụng. Chúng vẫn có thể tồn tại trên máy, được ignore bởi Git và **không tự import lên Supabase**. Sao lưu cả database lẫn uploads trước khi chuyển dữ liệu; phải xác định UUID chủ sở hữu từng bản ghi trước khi import. Không tự gán lịch sử cũ thành dữ liệu chung.
+
+Supabase lưu lịch sử đầy đủ dưới `history`, đánh giá dưới `reviews` và lượt sử dụng dưới `recognition_usage`. Các bảng bật RLS, không cho browser đọc/ghi trực tiếp; backend dùng service-role phải luôn kiểm tra user/scope. Theo dõi dung lượng Storage/database và ngân sách AI. Xóa tài khoản cần dọn object Storage riêng, vì database cascade không tự xóa file ảnh.
 
 ## Xử lý sự cố
 
 | Hiện tượng | Kiểm tra |
 | --- | --- |
-| Thiếu `DEEPSEEK_API_KEY` | Điền khóa trong `.env` ở thư mục gốc, khởi động lại server |
-| DeepSeek trả lỗi HTTP | Xem mã lỗi trong terminal/Network, kiểm tra khóa, tài khoản và quyền dùng model |
-| Nhận diện quá lâu | Kiểm tra mạng; request AI có timeout 120 giây |
-| Không tải được API sau khi đổi cổng | Sửa cả `PORT` và `API_URL` trong `public/app.js` |
-| Lịch sử cũ hiện `null` | Bản ghi được lưu thiếu dữ liệu từ phiên bản cũ; cần phân tích lại, không tự khôi phục từ bản sửa |
-| Excel không có ảnh | Kiểm tra file tương ứng trong `uploads/`; khởi động lại backend và tải file Excel mới |
-| Không có màu/icon hoặc thông báo | Kiểm tra kết nối và khả năng truy cập các CDN |
-| `npm ci` báo lỗi ghi file | Kiểm tra quyền ghi, vị trí ổ cục bộ và `npm config get cache` |
+| “Chưa cấu hình Supabase” | Kiểm tra URL, public key, service-role key và redeploy/restart |
+| Không nhận email xác nhận/reset | Custom SMTP, domain gửi email, redirect allowlist và Auth rate limits |
+| 401 | Đăng nhập lại, kiểm tra token có thuộc đúng Supabase project |
+| 403 khi xem toàn bộ | UUID tài khoản phải có trong `ADMIN_USER_IDS` ở server |
+| 429 | Đã dùng 10 lượt/8h; chờ thời điểm `resetAt` |
+| 400 khi upload | Ảnh đúng định dạng, <=3 MiB, <=25 triệu pixel |
+| Lỗi database hoặc bucket | Migration đã chạy trên đúng project, bucket private tồn tại |
+| Excel thiếu ảnh | Kiểm tra object còn tồn tại và khóa ảnh thuộc đúng chủ sở hữu |
+| Dữ liệu biến mất khi đăng nhập tài khoản khác | Đây là phân tách dữ liệu riêng theo user; admin dùng chế độ xem toàn bộ |
 
 ## Thông tin dự án
 
-Tác giả khai báo trong `package.json`: **Mac Bao Anh**. Trường `license` hiện là `MIT`; repository chưa có file `LICENSE` riêng.
+Tác giả khai báo trong `package.json`: **Mac Bao Anh**. Trường `license` hiện là `MIT`; repository chưa có file `LICENSE` riêng. Kết quả và độ tin cậy do AI sinh ra chưa phải chỉ số được đánh giá trên tập dữ liệu của dự án.

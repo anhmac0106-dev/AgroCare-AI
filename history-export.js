@@ -3,7 +3,7 @@ import sharp from "sharp";
 import path from "node:path";
 import fs from "node:fs/promises";
 
-export async function createHistoryWorkbook(rows, uploadsDir = path.resolve("uploads")) {
+export async function createHistoryWorkbook(rows, uploadsDir = path.resolve("uploads"), imageLoader) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "AgroCare AI";
     workbook.created = new Date();
@@ -40,12 +40,12 @@ export async function createHistoryWorkbook(rows, uploadsDir = path.resolve("upl
         }
         const cell = row.getCell(5);
         if (!item.image) { cell.value = "Không có ảnh"; continue; }
-        if (typeof item.image !== "string" || /[\\/]/.test(item.image) || item.image === "." || item.image === "..") {
+        if (!imageLoader && (typeof item.image !== "string" || /[\\/]/.test(item.image) || item.image === "." || item.image === "..")) {
             cell.value = "Tên ảnh không hợp lệ";
             continue;
         }
         let source;
-        try { source = await fs.readFile(path.join(uploadsDir, item.image)); }
+        try { source = imageLoader ? await imageLoader(item) : await fs.readFile(path.join(uploadsDir, item.image)); }
         catch (error) {
             if (error.code !== "ENOENT") throw error;
             cell.value = "Không tìm thấy ảnh";
