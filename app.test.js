@@ -82,3 +82,17 @@ test('quota tier comes from verified admin ID, never client input',async()=>{
   assert.deepEqual(calls,[{name:'recognition_quota',args:{p_user_id:a,p_is_admin:isAdmin}},{name:'reserve_recognition',args:{p_user_id:a,p_is_admin:isAdmin}}]);
  }
 });
+
+test('reviews persist under verified owner and admin can read all users reviews',async()=>{
+ const rows=[];const store=fakeStore(rows);const read=store.from.bind(store);
+ store.from=table=>{const q=read(table);q.insert=row=>({select:()=>({single:async()=>{const saved={...row,id};rows.push(saved);return {data:{id}}}})});return q;};
+ const userApp=createApp({store});
+ const saved=await request(userApp).post('/api/reviews').set('Authorization','Bearer valid').send({name:'Người dùng A',star:5,content:'Nhận diện dễ sử dụng',user_id:b});
+ assert.equal(saved.status,200);assert.equal(rows[0].user_id,a);assert.equal(rows[0].content,'Nhận diện dễ sử dụng');
+ rows.push({id:b,user_id:b,name:'B',star:4,content:'Đánh giá của B'});
+ const own=await request(userApp).get('/api/reviews').set('Authorization','Bearer valid');assert.deepEqual(own.body.data.map(x=>x.user_id),[a]);
+ assert.equal((await request(userApp).get('/api/reviews?scope=all').set('Authorization','Bearer valid')).status,403);
+ const admin=createApp({store,adminIds:[a]});
+ const all=await request(admin).get('/api/reviews?scope=all').set('Authorization','Bearer valid');
+ assert.equal(all.status,200);assert.deepEqual(all.body.data.map(x=>x.user_id),[a,b]);
+});

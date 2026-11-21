@@ -29,6 +29,12 @@ Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để biết chi tiết v�
 - Kiểm tra đầu vào ở backend, giải mã ảnh thật trước khi gửi AI, giới hạn kích thước và hiển thị nội dung người dùng/AI bằng text để tránh thực thi HTML.
 - Giao diện sáng/tối.
 
+## Lưu và xem đánh giá
+
+Sau khi đăng nhập, người dùng điền tên, số sao và nội dung rồi chọn **Gửi đánh giá**. Backend lưu vào bảng `reviews` trên Supabase, gắn với UUID của phiên đăng nhập; đánh giá được giữ sau khi tải lại trang hoặc triển khai lại website.
+
+Quản trị viên đăng nhập, vào phần **Tài khoản AgroCare AI** ở đầu trang và bật **Quản trị: xem lịch sử và đánh giá của tất cả người dùng (chỉ đọc)**. Phần **Đánh giá từ người dùng** sẽ hiển thị đánh giá của mọi tài khoản, mới nhất trước. Chọn **Tải thêm 100 bản ghi** nếu còn dữ liệu. Admin chỉ được sửa/xóa đánh giá do chính mình tạo; người dùng thường chỉ xem đánh giá của mình.
+
 ## Yêu cầu và cài đặt
 
 - **Node.js 26.x** theo `engines` trong `package.json` và cấu hình Vercel, npm và Git. Môi trường kiểm tra cục bộ dùng Node.js 26.13.0.
@@ -188,7 +194,7 @@ Các test ứng dụng dùng mock cho dịch vụ bên ngoài, kiểm tra API x�
 
 Trạng thái xác minh gần nhất ngày **21/11/2026**:
 
-- **18 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
+- **19 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
 - Google login đã kiểm tra với hai tài khoản trên website, gồm khôi phục phiên sau reload và đăng xuất. Tài khoản quản trị đã hiển thị **50/50 lượt trong 24 giờ gần nhất** sau triển khai.
 - Kiểm tra SQL thực tế đã đạt: người dùng chặn lượt 11; admin chặn lượt 51; cửa sổ 8/24 giờ hết hạn đúng; giữ lượt gần đây khi đổi vai trò; RPC không mở trực tiếp cho browser. Kiểm tra RLS, quyền bảng và bucket private cũng đã thực hiện. Dữ liệu kiểm tra được rollback.
 - **Chưa xác minh lại nhận diện DeepSeek và xuất Excel với ảnh thật trên cloud; chưa chạy harness 20 kết nối Postgres đồng thời.** Không xem các mục này đã đạt chỉ từ test mock hoặc SQL tuần tự.
