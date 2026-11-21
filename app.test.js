@@ -96,3 +96,11 @@ test('reviews persist under verified owner and admin can read all users reviews'
  const all=await request(admin).get('/api/reviews?scope=all').set('Authorization','Bearer valid');
  assert.equal(all.status,200);assert.deepEqual(all.body.data.map(x=>x.user_id),[a,b]);
 });
+
+test('review email is returned only to verified administrators',async()=>{
+ const store=fakeStore([{id,user_id:a,name:'A',star:5,content:'Good',user_email:'a@example.com'}]);
+ const regular=await request(createApp({store})).get('/api/reviews').set('Authorization','Bearer valid');
+ assert.equal(regular.status,200);assert.equal(Object.hasOwn(regular.body.data[0],'user_email'),false);
+ const admin=await request(createApp({store,adminIds:[a]})).get('/api/reviews?scope=all').set('Authorization','Bearer valid');
+ assert.equal(admin.body.data[0].user_email,'a@example.com');
+});

@@ -14,7 +14,7 @@ Website: [agro-care-ai-drab.vercel.app](https://agro-care-ai-drab.vercel.app).
 | AI | Backend gọi DeepSeek; model cấu hình hiện tại là `deepseek-flash` |
 | Quản trị | `anh.mac0106@gmail.com`, cấp quyền bằng UUID trong `ADMIN_USER_IDS` của môi trường Production |
 | Hạn mức | Người dùng: **10 lượt/8 giờ**; quản trị viên: **50 lượt/24 giờ**, tính theo cửa sổ trượt |
-| Database | Đã áp dụng cả hai migration trong `supabase/migrations/` |
+| Database | Đã áp dụng ba migration trong `supabase/migrations/` |
 
 Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để biết chi tiết vận hành. Phạm vi đã kiểm chứng và các bước còn cần nghiệm thu được ghi ở mục **Kiểm thử** bên dưới.
 
@@ -31,7 +31,7 @@ Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để biết chi tiết v�
 
 ## Lưu và xem đánh giá
 
-Sau khi đăng nhập, người dùng điền tên, số sao và nội dung rồi chọn **Gửi đánh giá**. Backend lưu vào bảng `reviews` trên Supabase, gắn với UUID của phiên đăng nhập; đánh giá được giữ sau khi tải lại trang hoặc triển khai lại website.
+Sau khi đăng nhập, người dùng điền tên, số sao và nội dung rồi chọn **Gửi đánh giá**. Backend lưu vào bảng `reviews` trên Supabase, gắn với UUID của phiên đăng nhập; database tự lưu email của tài khoản xác thực tại thời điểm gửi. Chỉ admin được API trả email và xem dòng **Gmail đăng nhập**. Email không lấy từ form; sửa đánh giá không thay đổi email đã lưu; đánh giá được giữ sau khi tải lại trang hoặc triển khai lại website.
 
 Quản trị viên đăng nhập, vào phần **Tài khoản AgroCare AI** ở đầu trang và bật **Quản trị: xem lịch sử và đánh giá của tất cả người dùng (chỉ đọc)**. Phần **Đánh giá từ người dùng** sẽ hiển thị đánh giá của mọi tài khoản, mới nhất trước. Chọn **Tải thêm 100 bản ghi** nếu còn dữ liệu. Admin chỉ được sửa/xóa đánh giá do chính mình tạo; người dùng thường chỉ xem đánh giá của mình.
 
@@ -109,6 +109,8 @@ Các bước dưới đây dùng cho môi trường mới; website production đ
    - [202611210002_admin_quota.sql](supabase/migrations/202611210002_admin_quota.sql): người dùng 10 lượt/8 giờ, admin 50 lượt/24 giờ.
 
    Với project đã chạy migration đầu, chỉ áp dụng migration thứ hai **trước khi deploy backend mới**. Không chạy lại migration đã áp dụng.
+   Sau khi backend có danh sách trường phản hồi an toàn cho người dùng thường đã được triển khai, chạy [202611210003_review_email.sql](supabase/migrations/202611210003_review_email.sql). Migration bổ sung email cho đánh giá cũ từ tài khoản Auth hiện tại và tự lưu email cho đánh giá mới. Không chạy migration này với backend cũ trả toàn bộ cột cho người dùng thường.
+
 2. Tạo Google OAuth client loại **Web application**, audience **External**. Đặt origin là URL website và redirect URI là `https://PROJECT_REF.supabase.co/auth/v1/callback`. Chuyển audience sang **Production** để người ngoài danh sách test đăng nhập được.
 3. Bật Google provider trong Supabase Auth, nhập Client ID và Client Secret. Secret chỉ lưu tại Supabase. Tắt Email provider và anonymous sign-in; ứng dụng không cần SMTP.
 4. Kết nối repository GitHub với Vercel, dùng nhánh `main`, Node.js 26.x và `vercel.json` đi kèm. Điền biến môi trường; Express phục vụ cả API và giao diện, không chỉ deploy thư mục `public/`.
@@ -194,7 +196,7 @@ Các test ứng dụng dùng mock cho dịch vụ bên ngoài, kiểm tra API x�
 
 Trạng thái xác minh gần nhất ngày **21/11/2026**:
 
-- **19 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
+- **20 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
 - Google login đã kiểm tra với hai tài khoản trên website, gồm khôi phục phiên sau reload và đăng xuất. Tài khoản quản trị đã hiển thị **50/50 lượt trong 24 giờ gần nhất** sau triển khai.
 - Kiểm tra SQL thực tế đã đạt: người dùng chặn lượt 11; admin chặn lượt 51; cửa sổ 8/24 giờ hết hạn đúng; giữ lượt gần đây khi đổi vai trò; RPC không mở trực tiếp cho browser. Kiểm tra RLS, quyền bảng và bucket private cũng đã thực hiện. Dữ liệu kiểm tra được rollback.
 - **Chưa xác minh lại nhận diện DeepSeek và xuất Excel với ảnh thật trên cloud; chưa chạy harness 20 kết nối Postgres đồng thời.** Không xem các mục này đã đạt chỉ từ test mock hoặc SQL tuần tự.

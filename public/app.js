@@ -148,6 +148,7 @@
       const card = node('article', '', 'reviewCard');
       card.append(node('h3', item.name), node('p', '★'.repeat(Math.max(0, Math.min(5, Number(item.star) || 0)))), node('small', dateText(item.created_at)), node('p', item.content));
       if (state.scope) card.append(node('small', `Tài khoản: ${item.user_id}`));
+      if (state.user?.isAdmin) card.append(node('small', `Gmail đăng nhập: ${item.user_email || 'Chưa có thông tin'}`));
       if (own(item)) {
         const edit = node('button', 'Sửa đánh giá', 'auth-secondary'); edit.type = 'button';
         edit.onclick = () => run(async epoch => {
