@@ -21,17 +21,21 @@ Tài liệu này là hướng dẫn triển khai, không phải xác nhận dị
 
 API xác thực bearer token qua Supabase Auth. Backend dùng service-role key nên phải kiểm tra chủ sở hữu trên mọi truy vấn; RLS không thay thế kiểm tra này. Người dùng chỉ đọc/sửa dữ liệu của mình. Quản trị viên có thể chọn chế độ xem toàn bộ; quyền này được xác định từ biến môi trường phía server, không từ metadata do người dùng tự sửa.
 
-## 3. Cấu hình đăng nhập email + mật khẩu
+## 3. Đăng nhập bằng Google
 
-Trong Authentication:
+Theo yêu cầu mới, ứng dụng chỉ hiển thị đăng nhập Google. Không cần SMTP hoặc mật khẩu riêng.
 
-1. Bật Email provider và **Confirm email**.
-2. Đặt Site URL thành URL production Vercel sau khi có deployment.
-3. Thêm redirect URL chính xác của website vào allowlist, cùng `http://localhost:3000` cho phát triển cục bộ nếu cần. Không dùng wildcard rộng cho domain không quản lý.
-4. Cấu hình **Custom SMTP** để gửi email xác nhận và khôi phục mật khẩu cho người dùng bên ngoài nhóm Supabase.
-5. Đặt chính sách mật khẩu mạnh và rà soát Auth rate limits. Kiểm tra luồng đăng ký, xác nhận email, đăng nhập, quên mật khẩu và đăng xuất trước khi public.
+1. Tạo Google Cloud project của chủ ứng dụng, cấu hình OAuth consent screen (Google Auth Platform) với audience External. Chỉ dùng thông tin cơ bản `openid`, `email`, `profile`, không xin quyền Gmail/Drive.
+2. Tạo OAuth client loại Web application. Authorized JavaScript origin là `https://agro-care-ai-drab.vercel.app`. Authorized redirect URI là callback hiển thị trong Supabase Google provider: `https://PROJECT_REF.supabase.co/auth/v1/callback`.
+3. Supabase → Authentication → Sign In / Providers → Google: bật provider, nhập Client ID và Client Secret. Secret chỉ lưu ở Supabase, không vào frontend/GitHub.
+4. Đặt Site URL và Redirect URL Supabase là `https://agro-care-ai-drab.vercel.app`. Thêm origin localhost riêng khi phát triển; không allowlist wildcard rộng.
+5. Tắt Email provider sau khi Google đã cấu hình. Giữ anonymous sign-in tắt.
+6. Trong Google Auth Platform, chuyển audience từ Testing sang Production để người dùng ngoài danh sách test đăng nhập được; hoàn thành các yêu cầu xác minh nếu Google yêu cầu.
+7. Kiểm tra Google redirect, đăng nhập lại sau refresh, đăng xuất, cách ly hai người dùng và quyền admin.
 
-SMTP mặc định của Supabase chỉ gửi đến địa chỉ thuộc nhóm project, có giới hạn thấp (tài liệu hiện ghi 2 email/giờ), và không dành cho production. Có thể dùng một nhà cung cấp SMTP có gói miễn phí phù hợp; điều kiện xác minh domain và hạn mức email tùy nhà cung cấp. **Không tắt xác nhận email chỉ để tránh cấu hình SMTP**, vì điều đó giúp tạo nhiều tài khoản nhằm vượt hạn mức. Xem [hướng dẫn SMTP chính thức](https://supabase.com/docs/guides/auth/auth-smtp).
+Supabase tự tạo Auth user khi người dùng đăng nhập Google lần đầu. UUID này tiếp tục là khóa phân quyền và quota. Không tự cấp admin bằng email/metadata.
+
+Tài liệu: [Supabase Google OAuth](https://supabase.com/docs/guides/auth/social-login/auth-google).
 
 ## 4. Biến môi trường
 
@@ -48,7 +52,7 @@ SMTP mặc định của Supabase chỉ gửi đến địa chỉ thuộc nhóm 
 
 Không đưa service-role key vào frontend, file `.env.example`, commit, screenshot hoặc chat. `.env` chỉ dùng cục bộ và đã được ignore. Sau khi thay biến môi trường Vercel, tạo deployment mới để áp dụng.
 
-Để chỉ định admin: đăng ký và xác nhận email bình thường, mở Supabase Authentication → Users, lấy UUID của đúng tài khoản, thêm UUID đó vào `ADMIN_USER_IDS` và redeploy. Không dùng email hiển thị hoặc giá trị `user_metadata.isAdmin` để cấp quyền.
+Để chỉ định admin: đăng nhập Google lần đầu, mở Supabase Authentication → Users, lấy UUID của đúng tài khoản, thêm UUID đó vào `ADMIN_USER_IDS` và redeploy. Không dùng email hiển thị hoặc giá trị `user_metadata.isAdmin` để cấp quyền.
 
 ## 5. Triển khai trên Vercel
 
@@ -95,7 +99,7 @@ Harness dùng 20 kết nối `psql` đồng thời, yêu cầu đúng 10 lượt
 
 ### Kiểm tra bằng hai người dùng và admin
 
-1. Đăng ký A và B, xác nhận email, đăng nhập bằng hai browser profile riêng.
+1. Đăng nhập Google bằng A và B trên hai browser profile riêng.
 2. A nhận diện, xem lịch sử và xuất Excel. B không thấy lịch sử/ảnh của A.
 3. Dùng token B gọi URL ảnh của A, sửa/xóa đánh giá của A, hoặc yêu cầu `scope=all`: phải bị từ chối hoặc không trả dữ liệu.
 4. Đăng xuất, gọi các API dữ liệu và ảnh không token: phải trả 401.
@@ -110,7 +114,7 @@ Harness dùng 20 kết nối `psql` đồng thời, yêu cầu đúng 10 lượt
 - SQLite và `uploads/` cũ vẫn ở máy phát triển nhưng không được tự đưa lên cloud. Dữ liệu cũ chưa có `user_id`; cần chỉ định người sở hữu từng bản ghi trước khi import, không gán toàn bộ thành dữ liệu công khai.
 - Khi import có kiểm soát, chuẩn hóa ảnh, lưu vào bucket riêng tư theo người sở hữu, rồi ghi record với UUID Auth tương ứng. Sao lưu dữ liệu cũ trước khi thao tác.
 - Xóa Auth user sẽ cascade các dòng trong database; Storage object không tự cascade. Cần quy trình dọn ảnh khi xóa tài khoản và kiểm tra object không còn được tham chiếu để tránh đầy 1 GB.
-- Theo dõi Storage, database, egress, SMTP và ngân sách DeepSeek. Khi vượt gói miễn phí, giới hạn tính năng hoặc nâng cấp theo quyết định của chủ dự án.
+- Theo dõi Storage, database, egress và ngân sách DeepSeek. Khi vượt gói miễn phí, giới hạn tính năng hoặc nâng cấp theo quyết định của chủ dự án.
 - Có kế hoạch backup/export database và object storage riêng. Gói miễn phí không được xem là cam kết uptime hay chiến lược backup đầy đủ.
 
 ## Trạng thái xác minh

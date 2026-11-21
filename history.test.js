@@ -6,15 +6,16 @@ import { JSDOM } from 'jsdom';
 const html = fs.readFileSync('public/index.html', 'utf8');
 const script = fs.readFileSync('public/app.js', 'utf8');
 const session = { access_token: 'test-access-token', user: { id: 'user-a' } };
-async function boot({ loggedIn = true, pendingHistory, historyRecords } = {}) {
+async function boot({ loggedIn = true, pendingHistory, historyRecords, oauthError = null } = {}) {
   const dom = new JSDOM(html, { url: 'http://localhost:3000', runScripts: 'outside-only' });
-  const { window } = dom; const calls = []; let callback;
+  const { window } = dom; const calls = []; const oauthCalls = []; let callback;
   window.URL.createObjectURL = () => 'blob:test'; window.URL.revokeObjectURL = () => {};
   window.confirm = () => true;
   window.supabase = { createClient: () => ({ auth: {
     getSession: async () => ({ data: { session: loggedIn ? session : null }, error: null }),
     onAuthStateChange: fn => { callback = fn; return {}; },
-    signOut: async () => ({ error: null })
+    signOut: async () => ({ error: null }),
+    signInWithOAuth: async options => { oauthCalls.push(options); return { data: {}, error: oauthError }; }
   } }) };
   window.fetch = async (url, options = {}) => {
     calls.push({ url, options });
@@ -29,7 +30,7 @@ async function boot({ loggedIn = true, pendingHistory, historyRecords } = {}) {
     throw new Error(`Unexpected fetch ${url}`);
   };
   window.eval(script);
-  return { dom, window, calls, event: (event, value) => callback(event, value) };
+  return { dom, window, calls, oauthCalls, event: (event, value) => callback(event, value) };
 }
 
 test('private API requests require auth and untrusted values render as text', async t => {
@@ -72,22 +73,26 @@ test('recognition never sends a client-authored history insert', async t => {
   assert.equal(calls.some(c => c.url === '/api/history' && c.options.method === 'POST'), false);
 });
 
-test('password recovery mode is cleared on manual logout and SIGNED_OUT', async t => {
-  for (const action of ['manual', 'event']) {
-    await t.test(action, async t => {
-      const { dom, window, event } = await boot(); t.after(() => dom.window.close());
-      await window.agroReady;
-      event('PASSWORD_RECOVERY', session);
-      await new Promise(resolve => setTimeout(resolve, 20));
-      assert.equal(window.document.getElementById('updatePassword').hidden, false);
-      if (action === 'manual') window.document.getElementById('signOut').click();
-      else event('SIGNED_OUT', null);
-      await new Promise(resolve => setTimeout(resolve, 20));
-      assert.equal(window.document.getElementById('updatePassword').hidden, true);
-      assert.equal(window.document.getElementById('signIn').hidden, false);
-      assert.equal(window.document.getElementById('authForm').hidden, false);
-    });
-  }
+test('Google login uses the current origin and no password form', async t => {
+  const { dom, window, oauthCalls } = await boot({ loggedIn: false }); t.after(() => dom.window.close());
+  await window.agroReady;
+  assert.equal(window.document.querySelector('input[type=password]'), null);
+  window.document.getElementById('signInGoogle').click();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(oauthCalls.length, 1);
+  assert.equal(oauthCalls[0].provider, 'google');
+  assert.equal(oauthCalls[0].options.redirectTo, 'http://localhost:3000');
+  assert.equal(oauthCalls[0].options.queryParams.prompt, 'select_account');
+});
+
+test('Google login failure is displayed safely and allows retry', async t => {
+  const { dom, window } = await boot({ loggedIn: false, oauthError: { message: '<img src=x onerror=alert(1)>' } }); t.after(() => dom.window.close());
+  await window.agroReady;
+  window.document.getElementById('signInGoogle').click();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.match(window.document.getElementById('appMessage').textContent, /onerror/);
+  assert.equal(window.document.querySelector('#appMessage img'), null);
+  assert.equal(window.document.getElementById('signInGoogle').disabled, false);
 });
 
 test('100-row page offers next page with correct offset', async t => {

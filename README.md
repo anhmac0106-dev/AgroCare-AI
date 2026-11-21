@@ -1,12 +1,12 @@
 # AgroCare AI
 
-Ứng dụng web tiếng Việt phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử riêng theo tài khoản và xuất Excel có ảnh. Phiên bản này được chuẩn bị cho **Vercel + Supabase**: Express chạy API, Supabase cung cấp đăng nhập email/mật khẩu, Postgres và kho ảnh riêng tư.
+Ứng dụng web tiếng Việt phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử riêng theo tài khoản và xuất Excel có ảnh. Phiên bản này được chuẩn bị cho **Vercel + Supabase**: Express chạy API, Supabase cung cấp đăng nhập Google, Postgres và kho ảnh riêng tư.
 
-**Chưa thể xem việc chạy test cục bộ là xác nhận website đã được triển khai.** Cần tạo dịch vụ, cấu hình SMTP/biến môi trường và kiểm tra trên cloud theo [hướng dẫn triển khai](docs/DEPLOYMENT.md).
+Website: https://agro-care-ai-drab.vercel.app. Cấu hình Google OAuth và kiểm tra đăng nhập thực tế theo [hướng dẫn triển khai](docs/DEPLOYMENT.md) trước khi mở sử dụng rộng rãi.
 
 ## Chức năng
 
-- Đăng ký, xác nhận email, đăng nhập, khôi phục mật khẩu và đăng xuất qua Supabase Auth.
+- Đăng nhập bằng Google và đăng xuất qua Supabase Auth; không cần mật khẩu ứng dụng hay SMTP.
 - Chọn hoặc kéo thả ảnh để nhận diện; xem tên bệnh, độ tin cậy do AI trả về, mức độ, nguyên nhân, hướng xử lý và cách phòng tránh.
 - Mỗi tài khoản có tối đa **10 lượt nhận diện trong 8 giờ gần nhất**. Hạn mức được lưu và kiểm tra trong database, không phụ thuộc một phiên server.
 - Lịch sử và ảnh riêng theo người dùng. Quản trị viên có chế độ **xem toàn bộ**, không có quyền sửa/xóa dữ liệu của người khác qua API ứng dụng.
@@ -18,7 +18,7 @@
 ## Yêu cầu và cài đặt
 
 - **Node.js 26.x** theo `engines` trong `package.json` và cấu hình Vercel, npm và Git. Môi trường kiểm tra cục bộ dùng Node.js 26.13.0.
-- Project Supabase đã chạy migration, bật Email Auth và có bucket riêng tư.
+- Project Supabase đã chạy migration, bật Google Auth và có bucket riêng tư.
 - DeepSeek API key cho nhận diện. Các test mock không cần gọi DeepSeek thật.
 - Internet để dùng Auth, Storage, AI và các CDN giao diện.
 

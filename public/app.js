@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const PAGE_SIZE = 100;
   const JSON_EXPORT_LIMIT = 10000;
-  const state = { client: null, session: null, user: null, quota: null, history: [], reviews: [], scope: '', epoch: 0, controller: new AbortController(), urls: new Set(), busy: false, authBusy: false, recovery: false, previewUrl: null, moreHistory: false, moreReviews: false };
+  const state = { client: null, session: null, user: null, quota: null, history: [], reviews: [], scope: '', epoch: 0, controller: new AbortController(), urls: new Set(), busy: false, authBusy: false, previewUrl: null, moreHistory: false, moreReviews: false };
   const text = (id, value) => { if ($(id)) $(id).textContent = value ?? ''; };
   const message = (value, error = false) => { text('appMessage', value); $('appMessage').classList.toggle('is-error', error); };
   const node = (tag, value, className) => { const el = document.createElement(tag); el.textContent = value ?? ''; if (className) el.className = className; return el; };
@@ -15,7 +15,7 @@
   function releaseImages() { state.urls.forEach(url => URL.revokeObjectURL(url)); state.urls.clear(); }
   function clearPrivate() {
     state.controller.abort(); state.controller = new AbortController(); state.epoch++;
-    releaseImages(); state.history = []; state.reviews = []; state.user = null; state.quota = null; state.scope = ''; state.busy = false; state.recovery = false;
+    releaseImages(); state.history = []; state.reviews = []; state.user = null; state.quota = null; state.scope = ''; state.busy = false;
     $('adminScope').checked = false; $('adminControls').hidden = true;
     $('historyList').replaceChildren(node('p', 'Đăng nhập để xem lịch sử của bạn.'));
     $('reviewList').replaceChildren(node('p', 'Đăng nhập để xem đánh giá của bạn.'));
@@ -30,15 +30,13 @@
   function updateControls() {
     const loggedIn = Boolean(state.session && state.user);
     $('signedInPanel').hidden = !loggedIn;
-    $('authForm').hidden = loggedIn && !state.recovery;
+    $('authForm').hidden = loggedIn;
     $('detectButton').disabled = !loggedIn || state.busy || !(state.quota?.remaining > 0);
     for (const id of ['exportExcel','exportHistory','refreshHistory','sendReview']) $(id).disabled = !loggedIn || state.busy;
     $('clearHistory').disabled = !loggedIn || state.busy || Boolean(state.scope);
     $('adminScope').disabled = state.busy;
-    for (const id of ['signIn','signUp','resetPassword','updatePassword']) $(id).disabled = state.authBusy;
+    $('signInGoogle').disabled = state.authBusy || !state.client;
     $('signOut').disabled = state.authBusy;
-    $('updatePassword').hidden = !state.recovery;
-    $('signIn').hidden = state.recovery; $('signUp').hidden = state.recovery; $('resetPassword').hidden = state.recovery;
   }
   async function api(url, options = {}, epoch = state.epoch) {
     active(epoch);
@@ -193,35 +191,26 @@
   async function authAction(kind) {
     if (state.authBusy || !state.client) return;
     state.authBusy = true; updateControls();
-    const email = $('authEmail').value.trim(); const password = $('authPassword').value;
     try {
       let result;
       if (kind === 'signOut') {
-        state.session = null; clearPrivate(); result = await state.client.auth.signOut({ scope: 'local' });
-      } else if (kind === 'resetPassword') {
-        if (!$('authEmail').checkValidity() || !email) throw new Error('Nhập email hợp lệ để nhận liên kết đặt lại mật khẩu.');
-        result = await state.client.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+        state.session = null; clearPrivate();
+        result = await state.client.auth.signOut({ scope: 'local' });
       } else {
-        if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
-        if (kind !== 'updatePassword' && (!$('authEmail').checkValidity() || !email)) throw new Error('Nhập email hợp lệ.');
-        if (kind === 'signIn') result = await state.client.auth.signInWithPassword({ email, password });
-        if (kind === 'signUp') result = await state.client.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } });
-        if (kind === 'updatePassword') result = await state.client.auth.updateUser({ password });
+        result = await state.client.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: location.origin, queryParams: { prompt: 'select_account' } }
+        });
       }
       if (result.error) throw result.error;
-      $('authPassword').value = '';
-      if (kind === 'signUp') message('Kiểm tra email để xác nhận tài khoản trước khi đăng nhập.');
-      if (kind === 'resetPassword') message('Nếu email hợp lệ, liên kết đặt lại mật khẩu sẽ được gửi đến hộp thư.');
-      if (kind === 'updatePassword') { state.recovery = false; message('Đã đổi mật khẩu.'); }
-      if (kind === 'signOut') message('Đã đăng xuất.');
-      if (kind === 'signIn' || (kind === 'signUp' && result.data?.session)) await setSession(result.data.session);
+      message(kind === 'signOut' ? 'Đã đăng xuất.' : 'Đang chuyển đến Google để đăng nhập…');
     } catch (error) { message(error.message || 'Không thể đăng nhập.', true); }
     finally { state.authBusy = false; updateControls(); }
   }
   async function init() {
     clearPrivate();
-    for (const kind of ['signIn','signUp','signOut','resetPassword','updatePassword']) $(kind).onclick = () => authAction(kind);
-    $('authForm').onsubmit = event => { event.preventDefault(); void authAction(state.recovery ? 'updatePassword' : 'signIn'); };
+    $('signInGoogle').onclick = () => authAction('google');
+    $('signOut').onclick = () => authAction('signOut');
     $('imageInput').onchange = preview;
     $('dropArea').ondragover = event => event.preventDefault();
     $('dropArea').ondrop = event => { event.preventDefault(); if (event.dataTransfer.files.length) { $('imageInput').files = event.dataTransfer.files; preview(); } };
@@ -277,7 +266,6 @@
         // Supabase callbacks must not await another auth call inside the callback.
         setTimeout(async () => {
           await setSession(session);
-          if (event === 'PASSWORD_RECOVERY' && session && state.session?.user?.id === session.user.id) state.recovery = true;
           updateControls();
         }, 0);
       });

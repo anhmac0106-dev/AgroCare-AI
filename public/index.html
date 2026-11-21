@@ -94,19 +94,12 @@ MAIN
 <section id="account" class="auth-card" aria-labelledby="accountTitle">
   <h2 id="accountTitle">Tài khoản AgroCare AI</h2>
   <p>Lịch sử và ảnh phân tích là dữ liệu riêng của bạn; quản trị viên có quyền xem để hỗ trợ.</p>
-  <form id="authForm" class="auth-form">
-    <label for="authEmail">Email</label>
-    <input id="authEmail" type="email" autocomplete="email" maxlength="254" required>
-    <label for="authPassword">Mật khẩu</label>
-    <input id="authPassword" type="password" autocomplete="current-password" minlength="8" maxlength="128" required>
-    <p class="auth-help">Mật khẩu ít nhất 8 ký tự. Đăng ký mới cần xác nhận qua email.</p>
+  <div id="authForm" class="auth-form">
+    <p class="auth-help">Dùng tài khoản Google để đăng nhập. Không cần tạo mật khẩu riêng.</p>
     <div class="auth-actions">
-      <button id="signIn" type="submit">Đăng nhập</button>
-      <button id="signUp" type="button" class="auth-secondary">Đăng ký</button>
-      <button id="resetPassword" type="button" class="auth-secondary">Quên mật khẩu</button>
-      <button id="updatePassword" type="button" hidden>Lưu mật khẩu mới</button>
+      <button id="signInGoogle" type="button">Đăng nhập bằng Google</button>
     </div>
-  </form>
+  </div>
   <div id="signedInPanel" hidden>
     <p>Đã đăng nhập: <strong id="accountEmail"></strong></p>
     <button id="signOut" type="button" class="auth-secondary">Đăng xuất</button>
