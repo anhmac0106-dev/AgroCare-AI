@@ -1,8 +1,22 @@
 # AgroCare AI
 
-Ứng dụng web tiếng Việt phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử riêng theo tài khoản và xuất Excel có ảnh. Phiên bản này được chuẩn bị cho **Vercel + Supabase**: Express chạy API, Supabase cung cấp đăng nhập Google, Postgres và kho ảnh riêng tư.
+Ứng dụng web tiếng Việt phân tích ảnh cây trồng bằng DeepSeek, lưu lịch sử riêng theo tài khoản và xuất Excel có ảnh. Ứng dụng đang được triển khai trên **Vercel + Supabase**: Express chạy API, Supabase cung cấp đăng nhập Google, Postgres và kho ảnh riêng tư.
 
-Website: https://agro-care-ai-drab.vercel.app. Google OAuth đã cấu hình và kiểm tra đăng nhập trên production. Phạm vi kiểm tra và hướng dẫn vận hành nằm trong [hướng dẫn triển khai](docs/DEPLOYMENT.md).
+Website: [agro-care-ai-drab.vercel.app](https://agro-care-ai-drab.vercel.app).
+
+## Hiện trạng triển khai — 21/11/2026
+
+| Thành phần | Hiện trạng |
+| --- | --- |
+| Hosting | Vercel Hobby, triển khai tự động từ nhánh `main` trên GitHub |
+| Dữ liệu | Supabase Free: Postgres và bucket ảnh `plant-images` riêng tư |
+| Đăng nhập | Google OAuth qua Supabase Auth; Google audience External, In production; Email provider và đăng nhập ẩn danh tắt |
+| AI | Backend gọi DeepSeek; model cấu hình hiện tại là `deepseek-flash` |
+| Quản trị | `anh.mac0106@gmail.com`, cấp quyền bằng UUID trong `ADMIN_USER_IDS` của môi trường Production |
+| Hạn mức | Người dùng: **10 lượt/8 giờ**; quản trị viên: **50 lượt/24 giờ**, tính theo cửa sổ trượt |
+| Database | Đã áp dụng cả hai migration trong `supabase/migrations/` |
+
+Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để biết chi tiết vận hành. Phạm vi đã kiểm chứng và các bước còn cần nghiệm thu được ghi ở mục **Kiểm thử** bên dưới.
 
 ## Chức năng
 
@@ -73,29 +87,38 @@ ADMIN_USER_IDS=
 | `DEEPSEEK_API_KEY` | Khóa bí mật, chỉ dùng ở backend |
 | `DEEPSEEK_MODEL` | Mặc định `deepseek-flash` |
 | `SUPABASE_URL` | URL project Supabase |
-| `SUPABASE_ANON_KEY` | Public key phục vụ client đăng nhập |
-| `SUPABASE_SERVICE_ROLE_KEY` | Khóa đặc quyền, **tuyệt đối không đưa vào frontend hoặc Git** |
+| `SUPABASE_ANON_KEY` | Anon hoặc publishable key phục vụ client đăng nhập |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-role hoặc secret key dùng ở server, **tuyệt đối không đưa vào frontend hoặc Git** |
 | `ADMIN_USER_IDS` | UUID Supabase Auth của admin, phân tách bằng dấu phẩy; trống là không có admin |
 
 Quyền admin do server xác định từ `ADMIN_USER_IDS`, không nhận từ form hoặc metadata người dùng. Khóa thật nằm trong `.env` cục bộ hoặc Vercel Environment Variables; `.env.example` chỉ chứa mẫu trống.
 
 ## Chuẩn bị Supabase và Vercel
 
-1. Tạo project Supabase mới và chạy [SQL migration](supabase/migrations/202611210001_private_users.sql).
-2. Bật Email Auth, giữ xác nhận email và cấu hình Custom SMTP. SMTP mặc định Supabase chỉ gửi đến email thuộc nhóm project, không phù hợp mở đăng ký đại trà.
-3. Tạo deployment Vercel từ GitHub với `vercel.json` đi kèm, điền biến môi trường.
-4. Cập nhật Site URL và redirect allowlist trong Supabase bằng URL chính thức.
-5. Đăng ký tài khoản admin, lấy UUID Auth và thêm vào `ADMIN_USER_IDS`, rồi redeploy.
-6. Kiểm tra bằng ít nhất hai tài khoản thường và một admin trước khi mở public.
+Các bước dưới đây dùng cho môi trường mới; website production đã được cấu hình.
 
-Các bước cụ thể, điều kiện gói miễn phí, SMTP, SQL test và nghiệm thu nằm trong [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Vercel Hobby chỉ phù hợp mục đích cá nhân phi thương mại; Supabase Free có giới hạn và có thể pause khi không hoạt động. **Phí DeepSeek vẫn tính riêng.**
+1. Tạo project Supabase và chạy lần lượt:
+
+   - [202611210001_private_users.sql](supabase/migrations/202611210001_private_users.sql): bảng dữ liệu, RLS, bucket ảnh riêng tư và quota ban đầu.
+   - [202611210002_admin_quota.sql](supabase/migrations/202611210002_admin_quota.sql): người dùng 10 lượt/8 giờ, admin 50 lượt/24 giờ.
+
+   Với project đã chạy migration đầu, chỉ áp dụng migration thứ hai **trước khi deploy backend mới**. Không chạy lại migration đã áp dụng.
+2. Tạo Google OAuth client loại **Web application**, audience **External**. Đặt origin là URL website và redirect URI là `https://PROJECT_REF.supabase.co/auth/v1/callback`. Chuyển audience sang **Production** để người ngoài danh sách test đăng nhập được.
+3. Bật Google provider trong Supabase Auth, nhập Client ID và Client Secret. Secret chỉ lưu tại Supabase. Tắt Email provider và anonymous sign-in; ứng dụng không cần SMTP.
+4. Kết nối repository GitHub với Vercel, dùng nhánh `main`, Node.js 26.x và `vercel.json` đi kèm. Điền biến môi trường; Express phục vụ cả API và giao diện, không chỉ deploy thư mục `public/`.
+5. Trong Supabase Auth, đặt **Site URL** và **Redirect URLs** theo URL website. Khi phát triển cục bộ, thêm `http://localhost:3000` vào redirect allowlist và origin của Google OAuth client; thay cổng tương ứng nếu đổi `PORT`.
+6. Đăng nhập Google lần đầu để tạo Auth user. Lấy UUID của tài khoản quản trị trong Supabase Authentication → Users, thêm vào `ADMIN_USER_IDS` trên Vercel rồi redeploy. Email hoặc metadata do người dùng gửi không thể tự cấp quyền admin.
+7. Kiểm tra đăng nhập, quyền riêng tư, nhận diện và xuất báo cáo theo mục **Kiểm thử**. Sau khi thay biến môi trường Vercel, phải tạo deployment mới để áp dụng.
+
+Vercel và Supabase đang dùng gói miễn phí; **DeepSeek tính phí riêng**. Theo dõi usage và điều kiện sử dụng gói tại dashboard của từng nhà cung cấp; hạn mức ứng dụng áp dụng theo tài khoản, không phải giới hạn tổng chi phí AI.
 
 ## Quy tắc nhận diện và hạn mức
 
 - JPEG, PNG, GIF, WebP; tối đa **3 MiB**, tối đa **25 triệu pixel**.
-- Backend đọc nội dung ảnh thực, chuẩn hóa thành JPEG và thu nhỏ trước khi gửi DeepSeek/lưu Storage.
+- Backend đọc nội dung ảnh thực, chuẩn hóa thành JPEG và thu nhỏ trong khung 1600 × 1600 pixel (không phóng lớn) trước khi gửi DeepSeek/lưu Storage.
 - Ảnh sai bị chặn trước khi giữ lượt. Khi bắt đầu gọi AI, lượt đã tính; lỗi AI vẫn tiêu thụ lượt để tránh retry không giới hạn.
-- Quota là cửa sổ trượt: người dùng 10 lượt/8 giờ, admin 50 lượt/24 giờ. `resetAt` là thời điểm lượt cũ nhất hết hạn, không phải thời điểm hồi đồng loạt đủ 10 lượt.
+- Quota là cửa sổ trượt: người dùng 10 lượt/8 giờ, admin 50 lượt/24 giờ. `resetAt` là thời điểm lượt cũ nhất hết hạn, không phải thời điểm hồi đồng loạt toàn bộ hạn mức. Không reset theo nửa đêm.
+- Khi nhận diện, database dọn usage quá 24 giờ của tài khoản đó; các lượt trong 24 giờ được giữ lại kể cả với người dùng thường để tính đúng khi nâng quyền admin. Xóa lịch sử không hoàn lại quota.
 - SQL dùng khóa transaction theo user để chặn vượt hạn mức khi gửi nhiều request đồng thời qua các instance Vercel.
 - Thành công: backend **tự lưu lịch sử**, sau đó trả kết quả. Client không gọi `POST /api/history` để ghi kết quả tùy ý.
 
@@ -132,7 +155,9 @@ Phản hồi nhận diện gồm `success`, `historyId`, `image` (khóa object r
 
 Excel có STT, tên bệnh, mức độ, hướng xử lý, hình ảnh và thời gian. Ảnh được nhúng trong workbook, giữ tỷ lệ và neo tại dòng tương ứng; mở file không cần tải lại ảnh từ server.
 
-Mỗi request xuất tối đa **20 dòng**; workbook vượt **4 MiB** bị từ chối để phù hợp giới hạn phản hồi của Vercel. JSON là dữ liệu lịch sử đã tải, không kèm file ảnh. Tìm kiếm và thống kê giao diện chỉ phản ánh các dòng đang tải, không phải truy vấn toàn bộ dữ liệu trên server.
+- **Excel:** nút xuất lấy tối đa **20 lần phân tích gần nhất** trong phạm vi tài khoản hoặc chế độ admin đang chọn. API hỗ trợ `offset` để xuất các nhóm tiếp theo. Workbook vượt **4 MiB** bị từ chối.
+- **JSON:** nút xuất tải lần lượt các trang lịch sử trong phạm vi đang chọn, tối đa **10.000 bản ghi**. Nếu vượt ngưỡng, ứng dụng báo lỗi và không tải file một phần. File chứa dữ liệu và khóa ảnh, không nhúng ảnh.
+- Ô tìm kiếm chỉ lọc các dòng đã tải trên giao diện, **không lọc nội dung file xuất**. Thống kê cũng tính trên các dòng đã tải; dùng nút “Tải thêm” để xem thêm từng nhóm 100 bản ghi.
 
 ## Cấu trúc mã nguồn
 
@@ -142,6 +167,7 @@ backend.js                        # createApp, auth, scope, validation, quota v�
 public/index.html                 # Giao diện và form tài khoản
 public/app.js                     # Auth, request có token, DOM an toàn, lịch sử
 public/style.css                  # Kiểu dáng
+public/privacy.html               # Thông tin quyền riêng tư
 supabase/migrations/               # Schema, RLS, bucket và quota RPC
 supabase/tests/                    # Test SQL/quota đồng thời cần Postgres thật
 history-export.js                 # Excel và thumbnail nhúng
@@ -160,7 +186,14 @@ npm test
 
 Các test ứng dụng dùng mock cho dịch vụ bên ngoài, kiểm tra API xác thực/phân quyền, nhận diện/quota, xử lý nội dung, frontend và Excel. Không cần khóa AI thật cho test mock.
 
-**SQL chưa được chứng minh bằng test mock.** Chạy `supabase/tests/quota.sql` và `quota-concurrency.mjs` theo [hướng dẫn kiểm tra](docs/DEPLOYMENT.md#7-kiểm-tra-bắt-buộc-trước-khi-mở-public) trên project Supabase thử nghiệm. Cần xác nhận 20 request đồng thời chỉ nhận đúng 10 lượt, RLS/private bucket có hiệu lực và người B không truy cập được dữ liệu của người A.
+Trạng thái xác minh gần nhất ngày **21/11/2026**:
+
+- **18 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
+- Google login đã kiểm tra với hai tài khoản trên website, gồm khôi phục phiên sau reload và đăng xuất. Tài khoản quản trị đã hiển thị **50/50 lượt trong 24 giờ gần nhất** sau triển khai.
+- Kiểm tra SQL thực tế đã đạt: người dùng chặn lượt 11; admin chặn lượt 51; cửa sổ 8/24 giờ hết hạn đúng; giữ lượt gần đây khi đổi vai trò; RPC không mở trực tiếp cho browser. Kiểm tra RLS, quyền bảng và bucket private cũng đã thực hiện. Dữ liệu kiểm tra được rollback.
+- **Chưa xác minh lại nhận diện DeepSeek và xuất Excel với ảnh thật trên cloud; chưa chạy harness 20 kết nối Postgres đồng thời.** Không xem các mục này đã đạt chỉ từ test mock hoặc SQL tuần tự.
+
+Để kiểm tra database trên môi trường thử nghiệm, chạy `supabase/tests/quota.sql` và `quota-concurrency.mjs` theo [hướng dẫn kiểm tra](docs/DEPLOYMENT.md#7-kiểm-tra-bắt-buộc-trước-khi-mở-public) trên project Supabase thử nghiệm. Script SQL kiểm tra cả hai hạn mức và quyền database. Harness đồng thời dùng 20 request của tài khoản thường, yêu cầu chỉ nhận đúng 10 lượt. Khi nghiệm thu bằng ảnh thật, cần xác nhận người B không xem được lịch sử/ảnh của người A.
 
 ## Dữ liệu cũ và vận hành
 
@@ -173,9 +206,12 @@ Supabase lưu lịch sử đầy đủ dưới `history`, đánh giá dưới `r
 | Hiện tượng | Kiểm tra |
 | --- | --- |
 | “Chưa cấu hình Supabase” | Kiểm tra URL, public key, service-role key và redeploy/restart |
-| Không nhận email xác nhận/reset | Custom SMTP, domain gửi email, redirect allowlist và Auth rate limits |
+| Google báo `redirect_uri_mismatch` | Callback Google phải trùng `https://PROJECT_REF.supabase.co/auth/v1/callback`; kiểm tra đúng OAuth client |
+| Google chỉ cho tài khoản test đăng nhập | Kiểm tra audience External và trạng thái Production của Google OAuth |
+| Đăng nhập quay về sai website hoặc localhost | Kiểm tra Site URL và Redirect URLs trong Supabase Auth |
 | 401 | Đăng nhập lại, kiểm tra token có thuộc đúng Supabase project |
 | 403 khi xem toàn bộ | UUID tài khoản phải có trong `ADMIN_USER_IDS` ở server |
+| Admin vẫn có 10 lượt/8 giờ | Kiểm tra UUID trong `ADMIN_USER_IDS`, migration thứ hai và deployment mới nhất; tải lại trang |
 | 429 | Đã dùng hết hạn mức (người dùng 10/8h, admin 50/24h); chờ thời điểm `resetAt` |
 | 400 khi upload | Ảnh đúng định dạng, <=3 MiB, <=25 triệu pixel |
 | Lỗi database hoặc bucket | Migration đã chạy trên đúng project, bucket private tồn tại |
@@ -185,6 +221,3 @@ Supabase lưu lịch sử đầy đủ dưới `history`, đánh giá dưới `r
 ## Thông tin dự án
 
 Tác giả khai báo trong `package.json`: **Mac Bao Anh**. Trường `license` hiện là `MIT`; repository chưa có file `LICENSE` riêng. Kết quả và độ tin cậy do AI sinh ra chưa phải chỉ số được đánh giá trên tập dữ liệu của dự án.
-
-
-Sau migration khởi tạo, chạy `supabase/migrations/202611210002_admin_quota.sql` để áp dụng admin 50 lượt/24 giờ. Với project đã triển khai, chỉ chạy migration mới này trước khi deploy backend mới. Vai trò được backend xác định bằng `ADMIN_USER_IDS`; trình duyệt không được gọi RPC quota trực tiếp.
