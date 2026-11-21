@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import { createHistoryWorkbook } from "./history-export.js";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -6,7 +6,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import db from "./database.js";
-import { detectPlantDisease } from "./gemini.js";
+import { detectPlantDisease } from "./deepseek.js";
 
 dotenv.config();
 
@@ -109,7 +109,7 @@ app.get("/api/check-ai", (req, res) => {
 
         success: true,
 
-        ai: true
+        ai: Boolean(process.env.DEEPSEEK_API_KEY?.trim())
 
     });
 
@@ -738,119 +738,7 @@ app.get("/api/history/export-excel", (req, res) => {
 
             try {
 
-                const workbook = new ExcelJS.Workbook();
-
-                workbook.creator = "AgroCare AI";
-                workbook.created = new Date();
-
-                const worksheet = workbook.addWorksheet(
-                    "Lich su nhan dien"
-                );
-
-                // TIÊU ĐỀ
-                worksheet.mergeCells("A1:F1");
-
-                worksheet.getCell("A1").value =
-                    "AGROCARE AI - LỊCH SỬ NHẬN DIỆN BỆNH CÂY TRỒNG";
-
-                worksheet.getCell("A1").font = {
-                    bold: true,
-                    size: 16,
-                    color: { argb: "FFFFFFFF" }
-                };
-
-                worksheet.getCell("A1").alignment = {
-                    horizontal: "center",
-                    vertical: "middle"
-                };
-
-                worksheet.getCell("A1").fill = {
-                    type: "pattern",
-                    pattern: "solid",
-                    fgColor: { argb: "FF15803D" }
-                };
-
-                worksheet.getRow(1).height = 35;
-
-                // TIÊU ĐỀ CỘT
-                worksheet.columns = [
-                    { header: "STT", key: "id", width: 10 },
-                    { header: "Tên bệnh", key: "disease", width: 30 },
-                    { header: "Mức độ", key: "level", width: 18 },
-                    { header: "Hướng xử lý", key: "solution", width: 45 },
-                    { header: "Tên ảnh", key: "image", width: 25 },
-                    { header: "Thời gian", key: "created_at", width: 25 }
-                ];
-
-                worksheet.addRow([]);
-
-                const headerRow = worksheet.getRow(2);
-
-                headerRow.values = [
-                    "STT",
-                    "Tên bệnh",
-                    "Mức độ",
-                    "Hướng xử lý",
-                    "Tên ảnh",
-                    "Thời gian"
-                ];
-
-                headerRow.font = {
-                    bold: true,
-                    color: { argb: "FFFFFFFF" }
-                };
-
-                headerRow.alignment = {
-                    horizontal: "center",
-                    vertical: "middle"
-                };
-
-                headerRow.fill = {
-                    type: "pattern",
-                    pattern: "solid",
-                    fgColor: { argb: "FF16A34A" }
-                };
-
-                // THÊM DỮ LIỆU
-                rows.forEach((item, index) => {
-
-                    worksheet.addRow({
-                        id: index + 1,
-                        disease: item.disease || "Chưa xác định",
-                        level: item.level || "Chưa xác định",
-                        solution: item.solution || "",
-                        image: item.image || "",
-                        created_at: item.created_at || ""
-                    });
-
-                });
-
-                // ĐỊNH DẠNG BẢNG
-                worksheet.eachRow((row, rowNumber) => {
-
-                    if (rowNumber >= 3) {
-
-                        row.alignment = {
-                            vertical: "middle",
-                            wrapText: true
-                        };
-
-                        row.height = 30;
-
-                        row.eachCell(cell => {
-
-                            cell.border = {
-                                top: { style: "thin" },
-                                left: { style: "thin" },
-                                bottom: { style: "thin" },
-                                right: { style: "thin" }
-                            };
-
-                        });
-
-                    }
-
-                });
+                const workbook = await createHistoryWorkbook(rows);
 
                 // THIẾT LẬP TÊN FILE
                 const filename = "AgroCare_AI_Thong_Ke.xlsx";

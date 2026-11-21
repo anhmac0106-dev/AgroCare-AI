@@ -456,6 +456,8 @@ async function saveHistory(result){
 
     try{
 
+        const data = parseAIResult(result.result);
+
         await api(
 
             "/api/history",
@@ -468,11 +470,11 @@ async function saveHistory(result){
 
                     image:result.image,
 
-                    disease:result.result.disease,
+                    disease:data.disease,
 
-                    solution:result.result.solution,
+                    solution:data.solution,
 
-                    level:result.result.level
+                    level:data.level
 
                 })
 
@@ -809,10 +811,10 @@ await updateStatistics();
 }
 );
 /* ============================================================
-# PARSE KẾT QUẢ GEMINI
+# PARSE KẾT QUẢ AI
 ============================================================ */
 
-function parseGeminiResult(text){
+function parseAIResult(text){
 
     try{
 
@@ -855,7 +857,7 @@ function parseGeminiResult(text){
 
 function displayResult(response){
 
-    const data = parseGeminiResult(response.result);
+    const data = parseAIResult(response.result);
 
     const resultBox = document.getElementById("resultBox");
 

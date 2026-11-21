@@ -1,1 +1,31 @@
-node_modules
+node_modules/
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Machine-local npm cache (including a literal unexpanded Windows variable)
+/%LocalAppData%/
+.npm/
+npm-cache/
+.cache/
+
+# Runtime database and user-uploaded images
+/database/*.db
+/database/*.db-*
+/database/*.sqlite
+/database/*.sqlite-*
+/database/*.sqlite3
+/database/*.sqlite3-*
+/uploads/
+
+# Logs, test output, and OS metadata
+*.log
+coverage/
+.nyc_output/
+.DS_Store
+Thumbs.db
+Desktop.ini
+~$*
