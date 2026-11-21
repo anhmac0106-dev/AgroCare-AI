@@ -65,7 +65,7 @@
   }
   function showQuota() {
     const q = state.quota;
-    text('quotaStatus', q ? `Còn ${q.remaining}/${q.limit || 10} lượt trong 8 giờ gần nhất.${q.resetAt ? ` Lượt tiếp theo được hoàn lại từ ${dateText(q.resetAt)}.` : ''}` : 'Chưa tải được hạn mức.');
+    text('quotaStatus', q ? `Còn ${q.remaining}/${q.limit || 10} lượt trong ${q.windowHours || 8} giờ gần nhất.${q.resetAt ? ` Lượt tiếp theo được hoàn lại từ ${dateText(q.resetAt)}.` : ''}` : 'Chưa tải được hạn mức.');
     updateControls();
   }
   async function refreshMe(epoch = state.epoch) {

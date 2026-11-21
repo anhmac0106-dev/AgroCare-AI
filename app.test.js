@@ -68,3 +68,17 @@ test('configuration exposes public keys only and vendor SDK is served',async()=>
  assert.equal((await request(app).get('/vendor/supabase.js')).status,200);
  const page=await request(app).get('/');assert.equal(page.status,200);assert.ok(page.headers['content-security-policy']);
 });
+
+test('quota tier comes from verified admin ID, never client input',async()=>{
+ for(const isAdmin of [false,true]){
+  const store=fakeStore();const calls=[];
+  store.rpc=async(name,args)=>{calls.push({name,args});return {data:{allowed:false,used:isAdmin?50:10,remaining:0,limit:isAdmin?50:10,windowHours:isAdmin?24:8,resetAt:new Date(Date.now()+60000).toISOString()}}};
+  const app=createApp({store,adminIds:isAdmin?[a]:[],detect:()=>{throw Error('must not call AI')}});
+  const me=await request(app).get('/api/me?isAdmin=true').set('Authorization','Bearer valid');
+  assert.equal(me.body.quota.limit,isAdmin?50:10);assert.equal(me.body.quota.windowHours,isAdmin?24:8);
+  const sharp=(await import('sharp')).default;const image=await sharp({create:{width:2,height:2,channels:3,background:'green'}}).png().toBuffer();
+  const response=await request(app).post('/api/detect?isAdmin=true').set('Authorization','Bearer valid').attach('image',image,'leaf.png');
+  assert.equal(response.status,429);assert.match(response.body.error,new RegExp(isAdmin?'50 lượt trong 24':'10 lượt trong 8'));
+  assert.deepEqual(calls,[{name:'recognition_quota',args:{p_user_id:a,p_is_admin:isAdmin}},{name:'reserve_recognition',args:{p_user_id:a,p_is_admin:isAdmin}}]);
+ }
+});

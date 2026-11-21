@@ -8,7 +8,7 @@ Website production: https://agro-care-ai-drab.vercel.app. Supabase đã chạy m
 
 - Vercel Hobby dành cho dự án cá nhân phi thương mại. Nếu ứng dụng phục vụ hoạt động thương mại, cần chọn gói phù hợp thay vì mặc định Hobby. Xem [Vercel Hobby](https://vercel.com/docs/plans/hobby) và [Fair Use](https://vercel.com/docs/limits/fair-use-guidelines).
 - Supabase Free hiện có 500 MB database, 1 GB file storage và có thể pause sau một tuần không hoạt động. Theo dõi usage trên dashboard; miễn phí không đồng nghĩa dung lượng vô hạn. Xem [Supabase Pricing](https://supabase.com/pricing).
-- DeepSeek tính phí riêng. Hạn mức của ứng dụng là 10 lượt **mỗi tài khoản** trong 8 giờ gần nhất; nhiều tài khoản vẫn có thể tạo tổng chi phí lớn. Theo dõi và giới hạn ngân sách tại nhà cung cấp AI.
+- DeepSeek tính phí riêng. Hạn mức là 10 lượt/8 giờ cho người dùng, 50 lượt/24 giờ cho admin; nhiều tài khoản vẫn có thể tạo tổng chi phí lớn. Theo dõi và giới hạn ngân sách tại nhà cung cấp AI.
 - Upload được giới hạn 3 MiB để nằm dưới giới hạn request mặc định 4,5 MB của Vercel Functions, có tính phần multipart. Không cần bật thử nghiệm request lớn. Xem [Vercel payload limit](https://vercel.com/docs/errors/function_payload_too_large).
 
 ## 2. Tạo Supabase project
@@ -67,8 +67,8 @@ Nếu Vercel không cho import repository do quyền Git integration, chủ repo
 
 ## 6. Hạn mức nhận diện
 
-- Cửa sổ trượt: luôn xét các lượt trong **8 giờ gần nhất**, không reset đồng loạt theo giờ cố định.
-- Quota áp dụng cả admin. `resetAt` là thời điểm lượt cũ nhất còn trong cửa sổ hết hạn; khi đó có thêm một lượt, không nhất thiết hồi đủ 10 lượt.
+- Cửa sổ trượt: luôn xét các lượt trong **8 giờ gần nhất** với người dùng, **24 giờ gần nhất** với admin, không reset đồng loạt theo giờ cố định.
+- Admin có hạn mức 50 lượt/24 giờ; người dùng có 10 lượt/8 giờ. `resetAt` là thời điểm lượt cũ nhất còn trong cửa sổ hết hạn; khi đó có thêm một lượt, không nhất thiết hồi đủ 10 lượt.
 - File sai hoặc quá lớn bị chặn trước khi gọi AI. Khi lượt đã được giữ chỗ để gọi AI, lỗi provider vẫn tiêu thụ lượt để tránh vòng retry làm phát sinh chi phí không giới hạn.
 - RPC `reserve_recognition` khóa theo UUID người dùng trong Postgres, kiểm tra số lượt và ghi lượt mới trong cùng transaction. Không dùng biến đếm trong RAM của Vercel.
 - Chỉ `service_role` được gọi quota RPC. Client không thể tự xóa, sửa usage hoặc gọi RPC cho người khác.
@@ -125,3 +125,6 @@ Harness dùng 20 kết nối `psql` đồng thời, yêu cầu đúng 10 lượt
 - Hai tài khoản Google đăng nhập thực tế thành công. Đã kiểm tra khôi phục phiên sau reload, tải quota 10/10, lịch sử/đánh giá và đăng xuất. Email provider tắt; không cần SMTP cho đăng nhập Google.
 - Bộ test ứng dụng hiện có 17 test đạt (quyền sở hữu, giới hạn đầu vào, quota mock, Google login, XSS rendering, xuất Excel nhúng ảnh).
 - Chưa xác minh lại nhận diện DeepSeek và xuất Excel bằng ảnh thật trên cloud, chưa chạy harness 20 kết nối Postgres đồng thời. Không coi những mục này đã đạt chỉ từ test mock.
+
+
+Sau migration khởi tạo, chạy `supabase/migrations/202611210002_admin_quota.sql` để áp dụng admin 50 lượt/24 giờ. Với project đã triển khai, chỉ chạy migration mới này trước khi deploy backend mới. Vai trò được backend xác định bằng `ADMIN_USER_IDS`; trình duyệt không được gọi RPC quota trực tiếp.

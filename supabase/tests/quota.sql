@@ -10,9 +10,9 @@ declare
   u uuid := current_setting('test.user_id')::uuid;
   q jsonb;
 begin
-  if has_function_privilege('anon', 'public.reserve_recognition(uuid)', 'EXECUTE')
-     or has_function_privilege('authenticated', 'public.reserve_recognition(uuid)', 'EXECUTE')
-     or has_function_privilege('authenticated', 'public.recognition_quota(uuid)', 'EXECUTE')
+  if has_function_privilege('anon', 'public.reserve_recognition(uuid,boolean)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.reserve_recognition(uuid,boolean)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.recognition_quota(uuid,boolean)', 'EXECUTE')
   then raise exception 'Quota RPC exposed to browser'; end if;
   if has_table_privilege('anon','public.history','SELECT')
      or has_table_privilege('authenticated','public.history','INSERT')
@@ -36,7 +36,18 @@ begin
   q := public.reserve_recognition(u);
   if not (q->>'allowed')::boolean or (q->>'used')::integer <> 1
   then raise exception 'Window did not expire: %', q; end if;
-  raise notice 'PASS quota, expiration, table privileges, RLS and bucket checks';
+  q := public.recognition_quota(u,true);
+  if (q->>'used')::integer <> 11 then raise exception 'Promotion lost 24h usage: %',q; end if;
+  for i in 12..50 loop
+    q := public.reserve_recognition(u,true);
+    if not (q->>'allowed')::boolean or (q->>'used')::integer <> i then raise exception 'Admin reservation % failed: %',i,q; end if;
+  end loop;
+  q := public.reserve_recognition(u,true);
+  if (q->>'allowed')::boolean or (q->>'limit')::integer <> 50 or (q->>'windowHours')::integer <> 24 then raise exception 'Admin 51st request accepted: %',q; end if;
+  update public.recognition_usage set created_at=clock_timestamp()-interval '24 hours 1 second' where user_id=u;
+  q := public.reserve_recognition(u,true);
+  if not (q->>'allowed')::boolean or (q->>'used')::integer <> 1 then raise exception 'Admin window did not expire: %',q; end if;
+  raise notice 'PASS ordinary 10/8, admin 50/24, promotion, expiry and permissions';
 end;
 $$;
 rollback;

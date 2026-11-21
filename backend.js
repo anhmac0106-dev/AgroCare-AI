@@ -43,20 +43,20 @@ export function createApp({store,adminIds=[],publicConfig={},detect=detectPlantD
  function scope(req){if(req.query.scope&&req.query.scope!=='all')throw fail(400,'Phạm vi không hợp lệ.');if(req.query.scope==='all'&&!req.isAdmin)throw fail(403,'Chỉ quản trị viên được xem toàn bộ.');return req.query.scope==='all';}
  function scoped(table,req,fields='*'){const all=scope(req);let q=store.from(table).select(fields);return all?q:q.eq('user_id',req.user.id);}
  async function list(table,req,limit=100){const offset=Number(req.query.offset||0);if(!Number.isSafeInteger(offset)||offset<0)throw fail(400,'Vị trí trang không hợp lệ.');return result(await scoped(table,req,table==='history'?'id,user_id,image,disease,solution,level,created_at':'*').order('created_at',{ascending:false}).range(offset,offset+limit-1));}
- app.get('/api/me',wrap(async(req,res)=>{const quota=result(await store.rpc('recognition_quota',{p_user_id:req.user.id}));res.json({success:true,user:{id:req.user.id,email:req.user.email,isAdmin:req.isAdmin},quota:{...quota,limit:10}});}));
+ app.get('/api/me',wrap(async(req,res)=>{const quota=result(await store.rpc('recognition_quota',{p_user_id:req.user.id,p_is_admin:req.isAdmin}));res.json({success:true,user:{id:req.user.id,email:req.user.email,isAdmin:req.isAdmin},quota});}));
  app.get('/api/check-ai',(req,res)=>res.json({success:true,ai:Boolean(process.env.DEEPSEEK_API_KEY?.trim())}));
  const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:maxImage,files:1,fields:0}});
  app.post('/api/detect',upload.single('image'),wrap(async(req,res)=>{
   if(!req.file)throw fail(400,'Chưa chọn ảnh.');
   let buffer;try{const processor=sharp(req.file.buffer,{limitInputPixels:25000000});const meta=await processor.metadata();if(!['jpeg','png','webp','gif'].includes(meta.format))throw Error();buffer=await processor.rotate().resize(1600,1600,{fit:'inside',withoutEnlargement:true}).jpeg({quality:85}).toBuffer();}catch{throw fail(400,'Ảnh không hợp lệ. Dùng JPEG, PNG, WebP hoặc GIF, tối đa 25 triệu pixel.');}
-  const quota=result(await store.rpc('reserve_recognition',{p_user_id:req.user.id}));
-  if(!quota.allowed){res.set('Retry-After',String(Math.max(1,Math.ceil((Date.parse(quota.resetAt)-Date.now())/1000))));return res.status(429).json({success:false,error:'Đã dùng hết 10 lượt trong 8 giờ gần nhất.',quota:{...quota,limit:10}});}
+  const quota=result(await store.rpc('reserve_recognition',{p_user_id:req.user.id,p_is_admin:req.isAdmin}));
+  if(!quota.allowed){res.set('Retry-After',String(Math.max(1,Math.ceil((Date.parse(quota.resetAt)-Date.now())/1000))));return res.status(429).json({success:false,error:`Đã dùng hết ${quota.limit} lượt trong ${quota.windowHours} giờ gần nhất.`,quota});}
   let parsed;try{parsed=validateAI(await detect(buffer));}catch(error){if(error.status)throw error;throw fail(502,'Không thể phân tích ảnh lúc này. Lượt gọi đã được tính; vui lòng thử lại sau.');}
   const image=`${req.user.id}/${randomUUID()}.jpg`;
   result(await store.storage.from(bucket).upload(image,buffer,{contentType:'image/jpeg',upsert:false}));
   const saved=await store.from('history').insert({user_id:req.user.id,image,disease:parsed.disease,solution:parsed.solution,level:parsed.level,result:parsed}).select('id').single();
   if(saved.error){await store.storage.from(bucket).remove([image]);result(saved);}
-  res.json({success:true,image,historyId:saved.data.id,result:JSON.stringify(parsed),quota:{...quota,limit:10}});
+  res.json({success:true,image,historyId:saved.data.id,result:JSON.stringify(parsed),quota});
  }));
  app.post('/api/history',(req,res)=>res.status(405).json({success:false,error:'Lịch sử được lưu tự động sau khi nhận diện.'}));
  app.get('/api/history',wrap(async(req,res)=>res.json({success:true,data:await list('history',req),pageSize:100})));

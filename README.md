@@ -8,7 +8,7 @@ Website: https://agro-care-ai-drab.vercel.app. Google OAuth đã cấu hình và
 
 - Đăng nhập bằng Google và đăng xuất qua Supabase Auth; không cần mật khẩu ứng dụng hay SMTP.
 - Chọn hoặc kéo thả ảnh để nhận diện; xem tên bệnh, độ tin cậy do AI trả về, mức độ, nguyên nhân, hướng xử lý và cách phòng tránh.
-- Mỗi tài khoản có tối đa **10 lượt nhận diện trong 8 giờ gần nhất**. Hạn mức được lưu và kiểm tra trong database, không phụ thuộc một phiên server.
+- Người dùng có **10 lượt nhận diện trong 8 giờ gần nhất**; quản trị viên có **50 lượt trong 24 giờ gần nhất**. Hạn mức được lưu và kiểm tra trong database, không phụ thuộc một phiên server.
 - Lịch sử và ảnh riêng theo người dùng. Quản trị viên có chế độ **xem toàn bộ**, không có quyền sửa/xóa dữ liệu của người khác qua API ứng dụng.
 - Tìm kiếm lịch sử, xem ảnh bằng API có xác thực, xuất JSON và Excel nhúng ảnh đúng dòng.
 - Tạo, xem, sửa, xóa đánh giá của chính mình; admin có thể xem đánh giá toàn bộ.
@@ -95,7 +95,7 @@ Các bước cụ thể, điều kiện gói miễn phí, SMTP, SQL test và ngh
 - JPEG, PNG, GIF, WebP; tối đa **3 MiB**, tối đa **25 triệu pixel**.
 - Backend đọc nội dung ảnh thực, chuẩn hóa thành JPEG và thu nhỏ trước khi gửi DeepSeek/lưu Storage.
 - Ảnh sai bị chặn trước khi giữ lượt. Khi bắt đầu gọi AI, lượt đã tính; lỗi AI vẫn tiêu thụ lượt để tránh retry không giới hạn.
-- Quota là cửa sổ trượt 8 giờ, áp dụng cả admin. `resetAt` là thời điểm lượt cũ nhất hết hạn, không phải thời điểm hồi đồng loạt đủ 10 lượt.
+- Quota là cửa sổ trượt: người dùng 10 lượt/8 giờ, admin 50 lượt/24 giờ. `resetAt` là thời điểm lượt cũ nhất hết hạn, không phải thời điểm hồi đồng loạt đủ 10 lượt.
 - SQL dùng khóa transaction theo user để chặn vượt hạn mức khi gửi nhiều request đồng thời qua các instance Vercel.
 - Thành công: backend **tự lưu lịch sử**, sau đó trả kết quả. Client không gọi `POST /api/history` để ghi kết quả tùy ý.
 
@@ -176,7 +176,7 @@ Supabase lưu lịch sử đầy đủ dưới `history`, đánh giá dưới `r
 | Không nhận email xác nhận/reset | Custom SMTP, domain gửi email, redirect allowlist và Auth rate limits |
 | 401 | Đăng nhập lại, kiểm tra token có thuộc đúng Supabase project |
 | 403 khi xem toàn bộ | UUID tài khoản phải có trong `ADMIN_USER_IDS` ở server |
-| 429 | Đã dùng 10 lượt/8h; chờ thời điểm `resetAt` |
+| 429 | Đã dùng hết hạn mức (người dùng 10/8h, admin 50/24h); chờ thời điểm `resetAt` |
 | 400 khi upload | Ảnh đúng định dạng, <=3 MiB, <=25 triệu pixel |
 | Lỗi database hoặc bucket | Migration đã chạy trên đúng project, bucket private tồn tại |
 | Excel thiếu ảnh | Kiểm tra object còn tồn tại và khóa ảnh thuộc đúng chủ sở hữu |
@@ -185,3 +185,6 @@ Supabase lưu lịch sử đầy đủ dưới `history`, đánh giá dưới `r
 ## Thông tin dự án
 
 Tác giả khai báo trong `package.json`: **Mac Bao Anh**. Trường `license` hiện là `MIT`; repository chưa có file `LICENSE` riêng. Kết quả và độ tin cậy do AI sinh ra chưa phải chỉ số được đánh giá trên tập dữ liệu của dự án.
+
+
+Sau migration khởi tạo, chạy `supabase/migrations/202611210002_admin_quota.sql` để áp dụng admin 50 lượt/24 giờ. Với project đã triển khai, chỉ chạy migration mới này trước khi deploy backend mới. Vai trò được backend xác định bằng `ADMIN_USER_IDS`; trình duyệt không được gọi RPC quota trực tiếp.
