@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { detectPlantDisease } from './deepseek.js';
+import { PROMPT } from './prompt.js';
 
 test('DeepSeek image request and error handling', async t => {
   const previous = process.env.DEEPSEEK_API_KEY;
@@ -27,6 +28,8 @@ test('DeepSeek image request and error handling', async t => {
     assert.equal(options.headers.Authorization, 'Bearer test-key');
     const payload = JSON.parse(options.body);
     assert.equal(payload.model, 'deepseek-flash');
+    assert.equal(payload.messages[0].content[0].text, PROMPT);
+    assert.deepEqual(payload.response_format, { type: 'json_object' });
     assert.equal(payload.messages[0].content[1].image_url.url, 'data:image/png;base64,' + bytes.toString('base64'));
     return Response.json({ choices: [{ message: { content: '{"disease":"test"}' }, finish_reason: 'stop' }] });
   });

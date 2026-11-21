@@ -104,3 +104,13 @@ test('review email is returned only to verified administrators',async()=>{
  const admin=await request(createApp({store,adminIds:[a]})).get('/api/reviews?scope=all').set('Authorization','Bearer valid');
  assert.equal(admin.body.data[0].user_email,'a@example.com');
 });
+
+test('AI result contract accepts all five severity states and rejects missing fields',async()=>{
+ const {validateAI}=await import('./backend.js');
+ const sample={disease:'Nhận định từ ảnh',confidence:'82%',level:'Nhẹ',cause:'Cần kiểm tra thực địa',solution:'1) Kiểm tra cây. 2) Theo dõi.',medicine:'Không cần sử dụng thuốc',prevent:'Vệ sinh vườn'};
+ for(const level of ['Không có','Nhẹ','Trung bình','Nặng','Không xác định']){
+  const value={...sample,level,...(level==='Không xác định'?{disease:'Không thể xác định',confidence:'0%',medicine:'Không áp dụng'}:{})};
+  assert.deepEqual(validateAI(JSON.stringify(value)),value);
+ }
+ for(const key of Object.keys(sample))assert.throws(()=>validateAI(JSON.stringify({...sample,[key]:null})),{status:502});
+});

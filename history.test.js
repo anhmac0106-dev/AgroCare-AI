@@ -120,3 +120,12 @@ test('JSON export rejects more than 10000 records without a partial download', a
   assert.equal(downloads, 0);
   assert.match(window.document.getElementById('appMessage').textContent, /vượt 10.000/);
 });
+
+test('history displays healthy and unknown states without counting them as diseased',async t=>{
+ const {dom,window}=await boot({historyRecords:[
+  {id:'healthy',user_id:'user-a',disease:'Cây khỏe mạnh',level:'Không có',solution:'Tiếp tục chăm sóc'},
+  {id:'unknown',user_id:'user-a',disease:'Không thể xác định',level:'Không xác định',solution:'Chụp rõ mặt trên/dưới lá'}
+ ]});t.after(()=>dom.window.close());await window.agroReady;
+ const doc=window.document;assert.match(doc.getElementById('historyList').textContent,/Không có/);assert.match(doc.getElementById('historyList').textContent,/Không xác định/);
+ assert.equal(doc.getElementById('totalDetect').textContent,'2');assert.equal(doc.getElementById('lightCount').textContent,'0');assert.equal(doc.getElementById('heavyCount').textContent,'0');
+});
