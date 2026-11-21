@@ -1,15 +1,30 @@
-# Vercel private users implementation plan
+# Hồ sơ kế hoạch: triển khai người dùng riêng tư trên Vercel
 
-Goal: Vercel Hobby + Supabase Free with email/password accounts, private history/images, admin read-all, 10 AI attempts per rolling 8h, validated input.
-Architecture: Express serverless API, Supabase Auth verified via getUser, Postgres persistence, private Storage bucket. Service-role backend explicitly scopes every query. Browser SDK for sign-in only. No local SQLite/uploads in production.
+> **Trạng thái: Hoàn tất và đã triển khai.** Tài liệu này lưu bối cảnh quyết định ban đầu; checklist bên dưới phản ánh hiện trạng kiểm tra ngày 21/11/2026. Hướng dẫn vận hành hiện hành nằm ở [docs/DEPLOYMENT.md](../../DEPLOYMENT.md).
 
-- [x] SQL: history(user_id,image,result fields), reviews(user_id), recognition_usage, private bucket; RLS deny client mutations, service-role-only quota RPC with per-user advisory transaction lock. Admin IDs only server env. Schema and deployment instructions.
-- [x] Backend: createApp injected service client; auth before upload; verified MIME/decode, max 3MiB image (Vercel 4.5MB default), private images via auth endpoint, auto-save detection, quota status /api/me, export own/all based on admin explicit scope; no client POST history. Export <=20 rows, thumbnails, response size guard.
-- [x] Frontend: email/password sign-up/in/out/reset; authenticated requests; safe DOM text; private image blobs; quota; admin scope; preserve history/reviews/export interactions.
-- [ ] Verify: cross-user access, admin scope, quota reject/no provider call, malicious content, invalid image, Excel; npm tests; docs for real cloud verification and deployment.
+## Mục tiêu hiện hành
 
-Interfaces: GET /api/config -> {supabaseUrl,supabaseAnonKey}; bearer Authorization on protected routes. GET /api/me -> {success,user:{id,email,isAdmin},quota:{used,limit:10,remaining,resetAt}}. GET history returns {success,data:[{id,user_id,image,disease,solution,level,result,created_at}]}; ?scope=all admin only. GET /api/history/:id/image returns bytes. POST /api/detect multipart image -> {success,image,historyId,result:JSON string}; server saves. Reviews CRUD own only; list own unless admin scope=all. POST history disabled. SQL RPC reserve_recognition(p_user_id uuid) and recognition_quota(p_user_id uuid) return JSON {allowed,used,remaining,resetAt}. Quota charged before AI, no refunds; invalid images rejected before quota.
+Vercel Hobby + Supabase Free; Google OAuth; dữ liệu riêng từng người dùng; admin đọc toàn bộ; quota thường 10 lượt/8 giờ và admin 50 lượt/24 giờ; kiểm tra nội dung đầu vào. Express chạy API/UI. Backend xác thực Supabase Auth qua `getUser`, lưu Postgres/Storage riêng tư và giới hạn truy vấn theo user hoặc scope admin đã xác minh.
 
-Review focus: cross-user IDs and signed URLs, concurrent quota requests across instances, untrusted HTML and filenames, provider failure after quota consumption, Vercel payload limits and export memory. No cloud deployment claimed without actual service credentials and verification.
+## Trạng thái giao hàng
 
-Local implementation and mock/DOM tests completed. External verification pending: run SQL/RLS/concurrency on Supabase test project, configure SMTP, Vercel build/deploy and real auth/AI tests. No deployment, commit or push performed for this change.
+- [x] Supabase schema, RLS, private image bucket, usage RPC có khóa theo user và migrations quota/email đánh giá đã áp dụng.
+- [x] Google OAuth Production; đăng nhập, khôi phục phiên và đăng xuất đã kiểm tra. Email/password provider và anonymous sign-in tắt; không dùng SMTP.
+- [x] Backend xác thực user, giới hạn ảnh 3 MiB/25 MP, chuẩn hóa ảnh, tự lưu lần nhận diện, review và export.
+- [x] Quota trượt: thường 10/8 giờ; admin 50/24 giờ. Backend lấy vai trò từ `ADMIN_USER_IDS`; database lưu email đánh giá từ Auth.
+- [x] Giao diện admin scope read-only, Gmail của đánh giá chỉ cho admin, 5 trạng thái kết quả prompt và Excel có ảnh nhúng.
+- [x] Bộ test ứng dụng: 22 bài đạt ở lần kiểm tra ghi nhận. Kiểm tra SQL production quota/email chạy rollback.
+- [ ] Chưa chạy harness 20 request Postgres đồng thời trong project test riêng.
+- [ ] Chưa xác minh nhận diện DeepSeek và Excel bằng ảnh thật trên production hoặc đo prompt trên tập ảnh thực địa.
+
+## Giao diện hiện hành
+
+- `GET /api/config` chỉ trả Supabase URL và public key. API dữ liệu yêu cầu bearer token.
+- `GET /api/me` trả user, vai trò và quota; hai quota RPC nhận `p_user_id` và `p_is_admin`, chỉ service role được gọi.
+- `GET /api/history` và `GET /api/reviews` trả dữ liệu của user; admin thêm `scope=all`. Email review chỉ có trong phản hồi admin.
+- `POST /api/detect` nhận multipart `image`, xác thực/chuẩn hóa, giữ quota, gọi DeepSeek và tự lưu. Lượt lỗi nhà cung cấp không được hoàn lại.
+- `POST /api/reviews` nhận tên, sao và nội dung. Trigger database gắn email từ `auth.users`, bỏ qua email do request gửi; chỉ admin được đọc email.
+
+## Migrations và tài liệu vận hành
+
+Production đã áp dụng migrations theo thứ tự: `202611210001_private_users.sql`, `202611210002_admin_quota.sql`, `202611210003_review_email.sql`. Không chạy lại migration đã áp dụng. README hướng dẫn setup local; [docs/DEPLOYMENT.md](../../DEPLOYMENT.md) là hướng dẫn hiện hành cho cấu hình, migration và nghiệm thu.

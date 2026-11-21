@@ -14,7 +14,7 @@ Website: [agro-care-ai-drab.vercel.app](https://agro-care-ai-drab.vercel.app).
 | AI | Backend gọi DeepSeek; model cấu hình hiện tại là `deepseek-flash` |
 | Quản trị | `anh.mac0106@gmail.com`, cấp quyền bằng UUID trong `ADMIN_USER_IDS` của môi trường Production |
 | Hạn mức | Người dùng: **10 lượt/8 giờ**; quản trị viên: **50 lượt/24 giờ**, tính theo cửa sổ trượt |
-| Database | Đã áp dụng ba migration trong `supabase/migrations/` |
+| Database | Ba migration đã áp dụng; quota và email review đã kiểm tra |
 
 Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để biết chi tiết vận hành. Phạm vi đã kiểm chứng và các bước còn cần nghiệm thu được ghi ở mục **Kiểm thử** bên dưới.
 
@@ -108,8 +108,7 @@ Các bước dưới đây dùng cho môi trường mới; website production đ
    - [202611210001_private_users.sql](supabase/migrations/202611210001_private_users.sql): bảng dữ liệu, RLS, bucket ảnh riêng tư và quota ban đầu.
    - [202611210002_admin_quota.sql](supabase/migrations/202611210002_admin_quota.sql): người dùng 10 lượt/8 giờ, admin 50 lượt/24 giờ.
 
-   Với project đã chạy migration đầu, chỉ áp dụng migration thứ hai **trước khi deploy backend mới**. Không chạy lại migration đã áp dụng.
-   Sau khi backend có danh sách trường phản hồi an toàn cho người dùng thường đã được triển khai, chạy [202611210003_review_email.sql](supabase/migrations/202611210003_review_email.sql). Migration bổ sung email cho đánh giá cũ từ tài khoản Auth hiện tại và tự lưu email cho đánh giá mới. Không chạy migration này với backend cũ trả toàn bộ cột cho người dùng thường.
+   Với project production hiện tại, cả ba migration đã chạy. Để nâng backend đang chạy, deploy backend có allowlist trường review an toàn **trước** rồi mới áp dụng migration 003; migration này backfill đánh giá cũ và tự lưu email từ Auth cho đánh giá mới. Project mới nên deploy backend an toàn trước khi bật migration chứa Gmail. Không chạy lại migration đã áp dụng.
 
 2. Tạo Google OAuth client loại **Web application**, audience **External**. Đặt origin là URL website và redirect URI là `https://PROJECT_REF.supabase.co/auth/v1/callback`. Chuyển audience sang **Production** để người ngoài danh sách test đăng nhập được.
 3. Bật Google provider trong Supabase Auth, nhập Client ID và Client Secret. Secret chỉ lưu tại Supabase. Tắt Email provider và anonymous sign-in; ứng dụng không cần SMTP.
@@ -201,7 +200,7 @@ Trạng thái xác minh gần nhất ngày **21/11/2026**:
 - Kiểm tra SQL thực tế đã đạt: người dùng chặn lượt 11; admin chặn lượt 51; cửa sổ 8/24 giờ hết hạn đúng; giữ lượt gần đây khi đổi vai trò; RPC không mở trực tiếp cho browser. Kiểm tra RLS, quyền bảng và bucket private cũng đã thực hiện. Dữ liệu kiểm tra được rollback.
 - **Chưa xác minh lại nhận diện DeepSeek và xuất Excel với ảnh thật trên cloud; chưa chạy harness 20 kết nối Postgres đồng thời.** Không xem các mục này đã đạt chỉ từ test mock hoặc SQL tuần tự.
 
-Để kiểm tra database trên môi trường thử nghiệm, chạy `supabase/tests/quota.sql` và `quota-concurrency.mjs` theo [hướng dẫn kiểm tra](docs/DEPLOYMENT.md#7-kiểm-tra-bắt-buộc-trước-khi-mở-public) trên project Supabase thử nghiệm. Script SQL kiểm tra cả hai hạn mức và quyền database. Harness đồng thời dùng 20 request của tài khoản thường, yêu cầu chỉ nhận đúng 10 lượt. Khi nghiệm thu bằng ảnh thật, cần xác nhận người B không xem được lịch sử/ảnh của người A.
+Để kiểm tra database trên môi trường thử nghiệm, chạy `supabase/tests/quota.sql` và `quota-concurrency.mjs` theo [hướng dẫn kiểm tra](docs/DEPLOYMENT.md#7-kiểm-thử-và-nghiệm-thu) trên project Supabase thử nghiệm. Script SQL kiểm tra cả hai hạn mức và quyền database. Harness đồng thời dùng 20 request của tài khoản thường, yêu cầu chỉ nhận đúng 10 lượt. Khi nghiệm thu bằng ảnh thật, cần xác nhận người B không xem được lịch sử/ảnh của người A.
 
 ## Dữ liệu cũ và vận hành
 
