@@ -44,7 +44,7 @@
     $('signedInPanel').hidden = !loggedIn;
     $('authForm').hidden = loggedIn;
     $('detectButton').disabled = !loggedIn || state.busy || !(state.quota?.remaining > 0);
-    for (const id of ['exportExcel','exportHistory','refreshHistory','sendReview']) $(id).disabled = !loggedIn || state.busy;
+    for (const id of ['exportExcel','exportHistory','sendReview']) $(id).disabled = !loggedIn || state.busy;
     $('clearHistory').disabled = !loggedIn || state.busy || Boolean(state.scope);
     $('adminScope').disabled = state.busy;
     $('imageInput').disabled = state.detection === 'loading';
@@ -256,7 +256,6 @@
         }
       }
     });
-    $('refreshHistory').onclick = () => run(async epoch => { await refreshMe(epoch); await refreshData(epoch); message('Đã cập nhật.'); });
     $('adminScope').onchange = () => run(async epoch => { state.scope = state.user?.isAdmin && $('adminScope').checked ? 'all' : ''; releaseImages(); $('historyList').replaceChildren(); $('reviewList').replaceChildren(); await refreshData(epoch); });
     $('searchHistory').oninput = renderHistory; $('searchReview').oninput = renderReviews; $('filterStar').onchange = renderReviews;
     $('clearHistory').onclick = () => run(async epoch => { if (state.scope || !window.confirm('Xóa toàn bộ lịch sử của riêng bạn?')) return; await json('/api/history', { method: 'DELETE' }, epoch); await refreshData(epoch); message('Đã xóa lịch sử của bạn.'); });
