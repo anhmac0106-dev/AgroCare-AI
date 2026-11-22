@@ -962,3 +962,8 @@ body.dark .auth-help { color:#d1d5db; }
   .history-controls #searchHistory,
   .history-controls button { width:100%; max-width:100%; min-height:44px; }
 }
+
+#detectButton { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.detect-spinner { width:1em; height:1em; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:detect-spin .8s linear infinite; flex-shrink:0; }
+@keyframes detect-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .detect-spinner { animation:none; } }

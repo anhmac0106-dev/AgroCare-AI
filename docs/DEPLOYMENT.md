@@ -123,7 +123,7 @@ Harness dùng 20 kết nối `psql` đồng thời, yêu cầu đúng 10 lượt
 - Supabase Free: cả ba migration production đã chạy. SQL thực tế xác minh RLS, quyền bảng/RPC, bucket private, người dùng 10/8h, admin 50/24h, giữ usage khi nâng quyền và hết hạn cửa sổ. Migration Gmail đánh giá đã backfill email hiện có. Test SQL email xác minh trigger chống giả mạo và quyền truy cập browser; toàn bộ dữ liệu thử nghiệm rollback.
 - Google OAuth thuộc project `hybrid-flame-515415-n3` (AgroCare AI), quản lý qua tài khoản Google Cloud được chủ dự án chỉ định. Audience External, trạng thái In production; callback đúng Supabase. Chỉ dùng email/profile.
 - Hai tài khoản Google đăng nhập thực tế thành công. Đã kiểm tra khôi phục phiên, đăng xuất, phạm vi admin và giao diện production hiển thị quota 50/50 trong 24 giờ. Gmail được lấy từ Auth, lưu cùng đánh giá, và chỉ trả qua API admin; giao diện admin đã xác nhận hiển thị email của đánh giá. Email provider tắt; không cần SMTP.
-- Bộ test ứng dụng hiện có 22 test đạt (quyền sở hữu, giới hạn đầu vào, quota mock, Google login, XSS rendering, xuất Excel nhúng ảnh).
+- Bộ test ứng dụng hiện có 24 test đạt (quyền sở hữu, giới hạn đầu vào, quota mock, Google login, XSS rendering, xuất Excel nhúng ảnh).
 - Chưa xác minh lại nhận diện DeepSeek và xuất Excel bằng ảnh thật trên cloud, chưa chạy harness 20 kết nối Postgres đồng thời, chưa đo chất lượng chẩn đoán prompt trên tập ảnh thực tế. Không coi những mục này đã đạt chỉ từ test mock.
 
 

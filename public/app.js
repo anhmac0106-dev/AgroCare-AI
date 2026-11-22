@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const PAGE_SIZE = 100;
   const JSON_EXPORT_LIMIT = 10000;
-  const state = { client: null, session: null, user: null, quota: null, history: [], reviews: [], scope: '', epoch: 0, controller: new AbortController(), urls: new Set(), busy: false, authBusy: false, previewUrl: null, moreHistory: false, moreReviews: false };
+  const state = { client: null, session: null, user: null, quota: null, history: [], reviews: [], scope: '', epoch: 0, controller: new AbortController(), urls: new Set(), busy: false, authBusy: false, previewUrl: null, detection: 'idle', moreHistory: false, moreReviews: false };
   const text = (id, value) => { if ($(id)) $(id).textContent = value ?? ''; };
   const message = (value, error = false) => { text('appMessage', value); $('appMessage').classList.toggle('is-error', error); };
   const node = (tag, value, className) => { const el = document.createElement(tag); el.textContent = value ?? ''; if (className) el.className = className; return el; };
@@ -27,6 +27,18 @@
     $('reviewName').value = ''; $('reviewContent').value = ''; clearPreview();
     updateControls();
   }
+  function detectionStatus(status) {
+    state.detection = status;
+    const button = $('detectButton');
+    const icon = document.createElement('span');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.className = status === 'loading' ? 'detect-spinner' : '';
+    icon.textContent = status === 'done' ? '✓' : status === 'loading' ? '' : '⌕';
+    button.replaceChildren(icon, document.createTextNode(status === 'loading' ? ' AI đang phân tích…' : status === 'done' ? ' Hoàn thành' : ' Nhận diện bằng AI'));
+    button.setAttribute('aria-busy', String(status === 'loading'));
+    button.setAttribute('aria-live', 'polite');
+    updateControls();
+  }
   function updateControls() {
     const loggedIn = Boolean(state.session && state.user);
     $('signedInPanel').hidden = !loggedIn;
@@ -35,6 +47,8 @@
     for (const id of ['exportExcel','exportHistory','refreshHistory','sendReview']) $(id).disabled = !loggedIn || state.busy;
     $('clearHistory').disabled = !loggedIn || state.busy || Boolean(state.scope);
     $('adminScope').disabled = state.busy;
+    $('imageInput').disabled = state.detection === 'loading';
+    $('clearResult').disabled = state.detection === 'loading';
     $('signInGoogle').disabled = state.authBusy || !state.client;
     $('signOut').disabled = state.authBusy;
   }
@@ -176,10 +190,13 @@
     finally { if (epoch === state.epoch) { state.busy = false; updateControls(); } }
   }
   function clearPreview() {
+    detectionStatus('idle');
     if (state.previewUrl) { URL.revokeObjectURL(state.previewUrl); state.previewUrl = null; }
     $('imageInput').value = ''; $('previewImage').removeAttribute('src'); $('previewImage').classList.add('hidden');
   }
   function preview() {
+    if (state.detection === 'loading') return;
+    detectionStatus('idle');
     const file = $('imageInput').files[0]; if (!file) return;
     if (file.size > 3 * 1024 * 1024 || !['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)) { clearPreview(); message('Chọn JPEG, PNG, WebP hoặc GIF tối đa 3 MiB.', true); return; }
     if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
@@ -214,16 +231,17 @@
     $('signOut').onclick = () => authAction('signOut');
     $('imageInput').onchange = preview;
     $('dropArea').ondragover = event => event.preventDefault();
-    $('dropArea').ondrop = event => { event.preventDefault(); if (event.dataTransfer.files.length) { $('imageInput').files = event.dataTransfer.files; preview(); } };
+    $('dropArea').ondrop = event => { event.preventDefault(); if (state.detection === 'loading') return; if (event.dataTransfer.files.length) { $('imageInput').files = event.dataTransfer.files; preview(); } };
     $('clearResult').onclick = () => { clearPreview(); $('resultBox').classList.add('hidden'); };
     $('copyResult').onclick = async () => { try { await navigator.clipboard.writeText(['disease','confidence','level','cause','solution','medicine','prevent'].map(id => $(id).textContent).join('\n')); message('Đã sao chép kết quả.'); } catch { message('Trình duyệt không cho phép sao chép.', true); } };
     $('detectButton').onclick = () => run(async epoch => {
       const file = $('imageInput').files[0]; if (!file) throw new Error('Vui lòng chọn ảnh.');
-      const form = new FormData(); form.append('image', file); message('Đang phân tích ảnh…');
+      const form = new FormData(); form.append('image', file); detectionStatus('loading'); message('AI đang phân tích ảnh…');
       try {
         const result = await json('/api/detect', { method: 'POST', body: form }, epoch);
         let data; try { data = typeof result.result === 'string' ? JSON.parse(result.result) : result.result; } catch { throw new Error('Kết quả AI không đúng định dạng.'); }
         for (const field of ['disease','confidence','level','cause','solution','medicine','prevent']) text(field, data?.[field] ?? 'Chưa xác định');
+        detectionStatus('done');
         $('resultBox').classList.remove('hidden');
         $('resultImage').removeAttribute('src');
         if (result.historyId) {
@@ -231,7 +249,12 @@
           const blob = await response.blob(); active(epoch); const url = URL.createObjectURL(blob); state.urls.add(url); $('resultImage').src = url;
         }
         await refreshData(epoch); message('Đã phân tích và lưu vào lịch sử riêng của bạn.');
-      } finally { if (epoch === state.epoch && state.session) await refreshMe(epoch); }
+      } finally {
+        if (epoch === state.epoch) {
+          if (state.detection === 'loading') detectionStatus('idle');
+          if (state.session) await refreshMe(epoch);
+        }
+      }
     });
     $('refreshHistory').onclick = () => run(async epoch => { await refreshMe(epoch); await refreshData(epoch); message('Đã cập nhật.'); });
     $('adminScope').onchange = () => run(async epoch => { state.scope = state.user?.isAdmin && $('adminScope').checked ? 'all' : ''; releaseImages(); $('historyList').replaceChildren(); $('reviewList').replaceChildren(); await refreshData(epoch); });

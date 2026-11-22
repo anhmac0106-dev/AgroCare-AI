@@ -129,3 +129,26 @@ test('history displays healthy and unknown states without counting them as disea
  const doc=window.document;assert.match(doc.getElementById('historyList').textContent,/Không có/);assert.match(doc.getElementById('historyList').textContent,/Không xác định/);
  assert.equal(doc.getElementById('totalDetect').textContent,'2');assert.equal(doc.getElementById('lightCount').textContent,'0');assert.equal(doc.getElementById('heavyCount').textContent,'0');
 });
+
+test('recognition button shows progress, completion and resets for a new image',async t=>{
+ const {dom,window}=await boot();t.after(()=>dom.window.close());await window.agroReady;
+ const doc=window.document;let release;const previous=window.fetch;
+ window.fetch=async(url,options)=>{if(url==='/api/detect')await new Promise(resolve=>{release=resolve});return previous(url,options)};
+ const input=doc.getElementById('imageInput');
+ Object.defineProperty(input,'files',{configurable:true,value:[new window.File(['image'],'leaf.png',{type:'image/png'})]});
+ doc.getElementById('detectButton').click();
+ assert.match(doc.getElementById('detectButton').textContent,/AI đang phân tích/);
+ assert.equal(doc.getElementById('detectButton').getAttribute('aria-busy'),'true');
+ assert.equal(doc.getElementById('clearResult').disabled,true);
+ release();await new Promise(resolve=>setTimeout(resolve,30));
+ assert.match(doc.getElementById('detectButton').textContent,/Hoàn thành/);
+ input.dispatchEvent(new window.Event('change'));
+ assert.match(doc.getElementById('detectButton').textContent,/Nhận diện bằng AI/);
+});
+test('failed recognition clears progress and allows retry',async t=>{
+ const {dom,window}=await boot();t.after(()=>dom.window.close());await window.agroReady;
+ const previous=window.fetch;window.fetch=async(url,options)=>url==='/api/detect'?Response.json({error:'AI unavailable'},{status:502}):previous(url,options);
+ Object.defineProperty(window.document.getElementById('imageInput'),'files',{configurable:true,value:[new window.File(['image'],'leaf.png',{type:'image/png'})]});
+ window.document.getElementById('detectButton').click();await new Promise(resolve=>setTimeout(resolve,30));
+ const button=window.document.getElementById('detectButton');assert.equal(button.getAttribute('aria-busy'),'false');assert.equal(button.disabled,false);assert.match(button.textContent,/Nhận diện bằng AI/);
+});

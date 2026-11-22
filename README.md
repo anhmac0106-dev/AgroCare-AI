@@ -27,6 +27,7 @@ Xem [hướng dẫn triển khai](docs/DEPLOYMENT.md) để biết chi tiết v�
 - Tìm kiếm lịch sử, xem ảnh bằng API có xác thực, xuất JSON và Excel nhúng ảnh đúng dòng.
 - Tạo, xem, sửa, xóa đánh giá của chính mình; admin có thể xem đánh giá toàn bộ.
 - Kiểm tra đầu vào ở backend, giải mã ảnh thật trước khi gửi AI, giới hạn kích thước và hiển thị nội dung người dùng/AI bằng text để tránh thực thi HTML.
+- Nút nhận diện hiển thị “AI đang phân tích…” kèm vòng xoay trong khi chờ; chuyển “Hoàn thành” khi có kết quả. Chọn ảnh mới sẽ đặt lại nút; lỗi cho phép thử lại.
 - Giao diện sáng/tối.
 
 ## Lưu và xem đánh giá
@@ -195,7 +196,7 @@ Các test ứng dụng dùng mock cho dịch vụ bên ngoài, kiểm tra API x�
 
 Trạng thái xác minh gần nhất ngày **21/11/2026**:
 
-- **22 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
+- **24 test ứng dụng đạt**: xác thực, quyền sở hữu, admin, quota, đầu vào, Google login, hiển thị nội dung an toàn và Excel nhúng ảnh. Đây là test dùng mock, không phải kiểm tra DeepSeek thật.
 - Google login đã kiểm tra với hai tài khoản trên website, gồm khôi phục phiên sau reload và đăng xuất. Tài khoản quản trị đã hiển thị **50/50 lượt trong 24 giờ gần nhất** sau triển khai.
 - Kiểm tra SQL thực tế đã đạt: người dùng chặn lượt 11; admin chặn lượt 51; cửa sổ 8/24 giờ hết hạn đúng; giữ lượt gần đây khi đổi vai trò; RPC không mở trực tiếp cho browser. Kiểm tra RLS, quyền bảng và bucket private cũng đã thực hiện. Dữ liệu kiểm tra được rollback.
 - **Chưa xác minh lại nhận diện DeepSeek và xuất Excel với ảnh thật trên cloud; chưa chạy harness 20 kết nối Postgres đồng thời.** Không xem các mục này đã đạt chỉ từ test mock hoặc SQL tuần tự.
