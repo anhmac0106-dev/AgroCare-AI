@@ -949,3 +949,12 @@ button:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:non
 body.dark .auth-card { background:#1f2937; color:#fff; }
 body.dark .auth-help { color:#d1d5db; }
 @media(max-width:768px) { .auth-card { padding:16px; } .auth-actions { flex-direction:column; } }
+
+/* Keep history actions inside the card on narrow screens. */
+.history-controls { min-width:0; }
+.history-controls > * { min-width:0; }
+@media (max-width: 767px) {
+  .history-controls { flex-direction:column; width:100%; }
+  .history-controls #searchHistory,
+  .history-controls button { width:100%; max-width:100%; min-height:44px; }
+}
